@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Genetic Algorithm</title>
+		<style type="text/css">
+			html, body {
+				margin: 0;
+				padding: 0;
+			}
+
+			body {
+				height: 100%;
+				background-color: #121212;
+				text-align: center;
+			}
+
+			#image {
+				 display: inline-block;
+				 width: 400px;
+				 height: 400px;
+			}
+
+			button {
+				background-color: #121212;
+				color: whitesmoke;
+				border: 2px solid whitesmoke;
+				border-radius: 0;
+				padding: 7px 14px;
+				margin-left: -2px;
+				font-weight: bold;
+				cursor: pointer;
+			}
+
+			button:hover, button:focus {
+				outline: none;
+				background-color: #333333;
+			}
+
+			button:first-child {
+				margin-left: 0;
+				border-top-left-radius: 4px;
+				border-bottom-left-radius: 4px;
+			}
+
+			button:last-child {
+				border-top-right-radius: 4px;
+				border-bottom-right-radius: 4px;
+			}
+
+			.blur {
+				-webkit-filter: blur(5px);
+				filter: blur(5px);
+			}
+		</style>
+	</head>
+	<body>
+		<div style="margin: 20px;">
+			<img id="image" src=""><canvas id="canvas"></canvas>
+		</div>
+		<div><button onclick="start();">Start</button><button onclick="cancelAnimFrame(tickId); tickId = false;">Pause</button><button onclick="reset();">Reset</button><button onclick="blurCanvas();">Toggle Blur</button></div>
+		<p style="color: lightgray;">Based on Chris Cummins's <a href="https://github.com/ChrisCummins/chriscummins.github.io/blob/master/js/genetics.js">implementation</a></p>
+		<script type="text/javascript">
+			'use strict';
+
+			window.requestAnimFrame =
+				window.requestAnimationFrame ||
+				window.webkitRequestAnimationFrame ||
+				window.mozRequestAnimationFrame ||
+				window.oRequestAnimationFrame ||
+				window.msRequestAnimationFrame ||
+				function(callback) {
+					window.setTimeout(callback, 1000 / 60);
+				};
+
+			window.cancelAnimFrame =
+				window.cancelAnimationFrame ||
+				window.mozCancelAnimationFrame;
+
+			function shuffle(array) { // Fisher–Yates Shuffle
+				var m = array.length, t, i;
+				while(m) {
+					i = Math.floor(Math.random() * m--);
+					t = array[m];
+					array[m] = array[i];
+					array[i] = t;
+				}
+				return array;
+			}
+
+			var tickId = false;
+			var vertices = 3;
+			var geneSize = 4 + vertices * 2;
+			var mutationChance = 0.01;
+			var mutationAmount = 0.1;
+			var width = 100;
+			var height = 100;
+			var canvas = document.getElementById('canvas');
+			canvas.width = 400;
+			canvas.height = 400;
+			var workingCanvas = document.createElement('canvas');
+			workingCanvas.width = width;
+			workingCanvas.height = height;
+			var imageCanvas = document.createElement('canvas');
+			imageCanvas.width = width;
+			imageCanvas.height = height;
+			var ctx = canvas.getContext('2d');
+			var workingCtx = workingCanvas.getContext('2d');
+			var imageCtx = imageCanvas.getContext('2d');
+
+			var data = [];
+			var imageData = [];
+
+			var Individual = function(p1, p2) {
+				this.data = [];
+
+				if(p1 && p2) {
+					for(var i = 0; i < 125; i++) {
+						var inherited = [];
+						if(Math.random() < 0.5) {
+							inherited = p1.data;
+						}
+						else {
+							inherited = p2.data;
+						}
+						for(var j = 0; j < geneSize; j++) {
+							var value = inherited[i * geneSize + j];
+							if(Math.random() < mutationChance) {
+								value += (Math.random() * 2 - 1) * mutationAmount;
+								value = Math.max(0, Math.min(1, value));
+							}
+							if(isNaN(value)) {
+								value = Math.random();
+							}
+							this.data.push(value);
+						}
+					}
+				}
+				else {
+					for(var i = 0; i < 125; i++) {
+						this.data.push(Math.random(),
+						               Math.random(),
+						               Math.random(),
+						               Math.max(Math.random() * Math.random(), 0.2));
+						var x = Math.random();
+						var y = Math.random();
+						for(var j = 0; j < 3; j++) {
+							this.data.push(x + Math.random() - 0.5,
+							               y + Math.random() - 0.5);
+						}
+					}
+				}
+
+				this.draw(workingCtx);
+				this.calculateFitness();
+			}
+
+			Individual.prototype.drawTriangle = function(ctx, index, scale) {
+				ctx.fillStyle = 'rgba(' + ~~(this.data[index] * 255) + ', ' +
+										  ~~(this.data[index + 1] * 255) + ', ' +
+										  ~~(this.data[index + 2] * 255) + ', ' +
+										  this.data[index + 3] + ')';
+				ctx.beginPath();
+				ctx.moveTo(this.data[index + 4] * width * scale, this.data[index + 5] * height * scale);
+				ctx.lineTo(this.data[index + 6] * width * scale, this.data[index + 7] * height * scale);
+				ctx.lineTo(this.data[index + 8] * width * scale, this.data[index + 9] * height * scale);
+				ctx.fill();
+			}
+
+			Individual.prototype.calculateFitness = function() {
+				var workingData = workingCtx.getImageData(0, 0, width, height).data;
+				var datalen = width * height * 4;
+				var diff = 0;
+				for(var p = 0; p < datalen; p++) {
+					var dp = imageData[p] - workingData[p];
+					diff += dp * dp;
+				}
+
+				this.fitness = 1 - diff / (datalen * 256 * 256);
+			}
+
+			Individual.prototype.draw = function(ctx, scale) {
+				scale = scale || 1;
+				ctx.fillStyle = 'black';
+				ctx.fillRect(0, 0, width * scale, height * scale);
+				for(var i = 0; i < this.data.length; i += geneSize) {
+					this.drawTriangle(ctx, i, scale);
+				}
+			}
+
+			function setImage(src) {
+				var image = new Image();
+				image.onload = function() {
+					imageCtx.drawImage(this, 0, 0, width, height);
+					imageData = imageCtx.getImageData(0, 0, width, height).data;
+				};
+				document.querySelector('img').src = src;
+				image.src = src;
+			}
+
+			function iterate() {
+				var datalen = data.length;
+
+				data = data.sort(function(a, b) {
+					return b.fitness - a.fitness;
+				});
+
+				data[0].draw(ctx, canvas.width / width);
+				mutationAmount = 0.1 / Math.pow(data[0].fitness, 2);
+
+				var breeders = data.slice(0, Math.max(2, ~~(datalen * 0.15)));
+				data = [];
+				for(var i = data.length; i < datalen; i++) {
+					breeders = shuffle(breeders);
+					data.push(new Individual(breeders[0], breeders[1]));
+				}
+
+				tickId = requestAnimFrame(iterate);
+			}
+
+			function start() {
+				if(!tickId) {
+					iterate();
+				}
+			}
+
+			function blurCanvas() {
+				canvas.classList.toggle('blur');
+			}
+
+			function reset() {
+				cancelAnimFrame(tickId);
+				tickId = false;
+
+				ctx.fillStyle = 'black';
+				ctx.fillRect(0, 0, canvas.width, canvas.width);
+
+				data = [];
+				for(var i = 0; i < 50; i++) {
+					data.push(new Individual());
+				}
+			}
+
+			setImage('mona.png');
+			reset();
+		</script>
+	</body>
+</html>
