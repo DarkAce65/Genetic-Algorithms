@@ -88,6 +88,7 @@
 			}
 
 			var tickId = false;
+			var numTriangles = 125;
 			var vertices = 3;
 			var geneSize = 4 + vertices * 2;
 			var mutationChance = 0.01;
@@ -114,7 +115,7 @@
 				this.data = [];
 
 				if(p1 && p2) {
-					for(var i = 0; i < 125; i++) {
+					for(var i = 0; i < numTriangles; i++) {
 						var inherited = [];
 						if(Math.random() < 0.5) {
 							inherited = p1.data;
@@ -136,7 +137,7 @@
 					}
 				}
 				else {
-					for(var i = 0; i < 125; i++) {
+					for(var i = 0; i < numTriangles; i++) {
 						this.data.push(Math.random(),
 						               Math.random(),
 						               Math.random(),
