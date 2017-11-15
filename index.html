@@ -15,9 +15,18 @@
 			}
 
 			#image {
-				 display: inline-block;
-				 width: 400px;
-				 height: 400px;
+				display: inline-block;
+				width: 400px;
+				height: 400px;
+				background-color: black;
+				background-position: center;
+				background-size: contain;
+				background-repeat: no-repeat;
+				margin-right: -2px;
+			}
+
+			#image, #canvas {
+				border: 2px solid #292929;
 			}
 
 			button {
@@ -55,7 +64,7 @@
 	</head>
 	<body>
 		<div style="margin: 20px;">
-			<img id="image" src=""><canvas id="canvas"></canvas>
+			<div id="image"></div><canvas id="canvas"></canvas>
 		</div>
 		<div><button onclick="start();">Start</button><button onclick="cancelAnimFrame(tickId); tickId = false;">Pause</button><button onclick="reset();">Reset</button><button onclick="blurCanvas();">Toggle Blur</button></div>
 		<p style="color: lightgray;">Based on Chris Cummins's <a href="https://github.com/ChrisCummins/chriscummins.github.io/blob/master/js/genetics.js">implementation</a></p>
@@ -139,14 +148,14 @@
 				else {
 					for(var i = 0; i < numTriangles; i++) {
 						this.data.push(Math.random(),
-						               Math.random(),
-						               Math.random(),
-						               Math.max(Math.random() * Math.random(), 0.2));
+									   Math.random(),
+									   Math.random(),
+									   Math.max(Math.random() * Math.random(), 0.2));
 						var x = Math.random();
 						var y = Math.random();
 						for(var j = 0; j < 3; j++) {
 							this.data.push(x + Math.random() - 0.5,
-							               y + Math.random() - 0.5);
+										   y + Math.random() - 0.5);
 						}
 					}
 				}
@@ -191,10 +200,19 @@
 			function setImage(src) {
 				var image = new Image();
 				image.onload = function() {
-					imageCtx.drawImage(this, 0, 0, width, height);
+					imageCtx.clearRect(0, 0, width, height);
+					var imageAspect = image.height / image.width;
+					if(imageAspect > height / width) {
+						var x = (1 - 1 / imageAspect) * width / 2;
+						imageCtx.drawImage(this, x, 0, width / imageAspect, height);
+					}
+					else {
+						var y = (1 - 1 * imageAspect) * height / 2;
+						imageCtx.drawImage(this, 0, y, width, height * imageAspect);
+					}
 					imageData = imageCtx.getImageData(0, 0, width, height).data;
 				};
-				document.querySelector('img').src = src;
+				document.querySelector('#image').style.backgroundImage = 'url(' + src + ')';
 				image.src = src;
 			}
 
