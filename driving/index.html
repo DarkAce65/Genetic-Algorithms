@@ -63,6 +63,18 @@
 			canvas.height = height;
 			var ctx = canvas.getContext('2d');
 
+			var engine = Matter.Engine.create();
+			engine.world.gravity.y = 0;
+			var render = Matter.Render.create({
+				canvas: canvas,
+				engine: engine,
+				options: {
+					showPositions: true,
+					showVelocity: true,
+					showAngleIndicator: true
+				}
+			});
+
 			var data = [];
 			var imageData = [];
 
@@ -103,22 +115,13 @@
 				}
 
 				this.fitness = 0;
-				this.setupSimulation();
+				resetSimulation();
 				// this.fitness = this.calculateFitness();
 			};
 
-			Individual.prototype.setupSimulation = function() {
-				var engine = Matter.Engine.create();
-				engine.world.gravity.y = 1;
-				var render = Matter.Render.create({
-					canvas: canvas,
-					engine: engine,
-					options: {
-						showPositions: true,
-						showVelocity: true,
-						showAngleIndicator: true
-					}
-				});
+			function resetSimulation() {
+				Matter.World.clear(engine.world);
+				Matter.Engine.clear(engine);
 
 				var boxA = Matter.Bodies.rectangle(400, 200, 80, 80);
 				var boxB = Matter.Bodies.rectangle(450, 50, 80, 80);
@@ -128,16 +131,15 @@
 				edges.push(Matter.Bodies.rectangle(810, 300, 20, 640, {isStatic: true}));
 				edges.push(Matter.Bodies.rectangle(400, 610, 840, 20, {isStatic: true}));
 
-				Matter.World.add(engine.world, [boxA, boxB].concat(edges));
-				this.engine = engine;
-				this.render = render;
+				Matter.World.add(engine.world, [boxA, boxB]);
+				Matter.World.add(engine.world, edges);
 			};
 
-			Individual.prototype.tick = function(time) {
-				Matter.Engine.update(this.engine, 1000 / 60);
-				Matter.Render.world(this.render);
+			function tick(time) {
+				Matter.Engine.update(engine, 1000 / 60);
+				Matter.Render.world(render);
 
-				tickId = requestAnimFrame(this.tick.bind(this));
+				tickId = requestAnimFrame(tick);
 			};
 
 			function iterate() {
@@ -170,9 +172,6 @@
 				cancelAnimFrame(tickId);
 				tickId = false;
 
-				ctx.fillStyle = 'black';
-				ctx.fillRect(0, 0, canvas.width, canvas.width);
-
 				data = [];
 				for(var i = 0; i < 20; i++) {
 					data.push(new Individual());
@@ -180,7 +179,7 @@
 			}
 
 			var a = new Individual();
-			a.tick();
+			tick();
 		</script>
 	</body>
 </html>
