@@ -69,8 +69,7 @@
 		<div style="margin: 20px;">
 			<div id="image"></div><canvas id="canvas"></canvas>
 		</div>
-		<div><button onclick="start();">Start</button><button onclick="cancelAnimFrame(tickId); tickId = false;">Pause</button><button onclick="reset();">Reset</button><button onclick="blurCanvas();">Toggle Blur</button></div>
-		<p style="color: lightgray;">To change the image, call <code>setImage('&lt;filename&gt;');<code> in the console.</p>
+		<div><button onclick="start();">Start</button><button onclick="cancelAnimFrame(tickId); tickId = false;">Pause</button><button onclick="reset();">Reset</button><button onclick="setImage();">Set Image</button><button onclick="blurCanvas();">Toggle Blur</button></div>
 		<p style="color: lightgray;">Based on Chris Cummins's <a href="https://github.com/ChrisCummins/chriscummins.github.io/blob/master/js/genetics.js">implementation</a></p>
 		<script type="text/javascript">
 			'use strict';
@@ -202,22 +201,28 @@
 			}
 
 			function setImage(src) {
-				var image = new Image();
-				image.onload = function() {
-					imageCtx.clearRect(0, 0, width, height);
-					var imageAspect = image.height / image.width;
-					if(imageAspect > height / width) {
-						var x = (1 - 1 / imageAspect) * width / 2;
-						imageCtx.drawImage(this, x, 0, width / imageAspect, height);
-					}
-					else {
-						var y = (1 - 1 * imageAspect) * height / 2;
-						imageCtx.drawImage(this, 0, y, width, height * imageAspect);
-					}
-					imageData = imageCtx.getImageData(0, 0, width, height).data;
-				};
-				document.querySelector('#image').style.backgroundImage = 'url(' + src + ')';
-				image.src = src;
+				if(!src) {
+					src = prompt('Enter the filename of the image');
+				}
+
+				if(src) {
+					var image = new Image();
+					image.onload = function() {
+						document.querySelector('#image').style.backgroundImage = 'url(' + src + ')';
+						imageCtx.clearRect(0, 0, width, height);
+						var imageAspect = image.height / image.width;
+						if(imageAspect > height / width) {
+							var x = (1 - 1 / imageAspect) * width / 2;
+							imageCtx.drawImage(this, x, 0, width / imageAspect, height);
+						}
+						else {
+							var y = (1 - 1 * imageAspect) * height / 2;
+							imageCtx.drawImage(this, 0, y, width, height * imageAspect);
+						}
+						imageData = imageCtx.getImageData(0, 0, width, height).data;
+					};
+					image.src = src;
+				}
 			}
 
 			function iterate() {
