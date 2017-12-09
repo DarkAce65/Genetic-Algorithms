@@ -24,6 +24,8 @@
 		<div style="margin: 20px;">
 			<canvas id="canvas"></canvas>
 		</div>
+		<div id="car"></div>
+		<div id="inputs"></div>
 		<script type="text/javascript">
 			'use strict';
 
@@ -52,6 +54,7 @@
 				return array;
 			}
 
+			var inputs = {};
 			var tickId = false;
 			var numHiddenNodes = 5;
 			var mutationChance = 0.01;
@@ -69,9 +72,12 @@
 				canvas: canvas,
 				engine: engine,
 				options: {
-					showPositions: true,
-					showVelocity: true,
-					showAngleIndicator: true
+					showAngleIndicator: true,
+					showBounds: true,
+					showCollisions: true,
+					showConvexHulls: true,
+					showSeparations: true,
+					showVelocity: true
 				}
 			});
 
@@ -115,29 +121,93 @@
 				}
 
 				this.fitness = 0;
-				resetSimulation();
+				this.car = new Car();
+				resetSimulation(this);
+				Matter.Events.on(engine, 'afterUpdate', function(event) {
+					var engine = event.source;
+					this.car.update();
+				}.bind(this));
 				// this.fitness = this.calculateFitness();
 			};
 
-			function resetSimulation() {
+			var Car = function(width, height) {
+				if(!width) {
+					width = 30;
+				}
+				if(!height) {
+					height = 60;
+				}
+
+				var chassis = Matter.Bodies.rectangle(0, 0, width, height);
+				var parts = [chassis];
+				var wheelOptions = {density: 0};
+				parts.push(Matter.Bodies.rectangle(-width / 2, -(height - 20) / 2, 5, 10, wheelOptions));
+				parts.push(Matter.Bodies.rectangle(width / 2, -(height - 20) / 2, 5, 10, wheelOptions));
+				parts.push(Matter.Bodies.rectangle(width / 2, (height - 20) / 2, 5, 10, wheelOptions));
+				parts.push(Matter.Bodies.rectangle(-width / 2, (height - 20) / 2, 5, 10, wheelOptions));
+
+
+				this.body = Matter.Body.create({parts: parts});
+				Matter.Body.scale(this.body, 4, 4);
+
+				this.steer = 0;
+				this.localVelocity = {x: 0, y: 0};
+				this.engineForce = 0;
+				this.brakingForce = 0;
+			};
+
+			Car.prototype.setPosition = function(x, y) {
+				Matter.Body.setPosition(this.body, {x: x, y: y});
+			};
+
+			Car.prototype.update = function() {
+				var left = inputs['key37'] ? -0.75 : 0;
+				var right = inputs['key39'] ? 0.75 : 0;
+				this.steer = this.steer * 0.9 + (left + right) * 0.1;
+				Matter.Body.setAngle(this.body.parts[2], this.steer);
+				Matter.Body.setAngle(this.body.parts[3], this.steer);
+
+				this.localVelocity = Matter.Vector.rotate(this.body.velocity, this.body.angle);
+			};
+
+			function resetSimulation(individual) {
+				Matter.Events.off(engine);
 				Matter.World.clear(engine.world);
 				Matter.Engine.clear(engine);
 
-				var boxA = Matter.Bodies.rectangle(400, 200, 80, 80);
-				var boxB = Matter.Bodies.rectangle(450, 50, 80, 80);
 				var edges = [];
 				edges.push(Matter.Bodies.rectangle(-10, 300, 20, 640, {isStatic: true}));
 				edges.push(Matter.Bodies.rectangle(400, -10, 840, 20, {isStatic: true}));
 				edges.push(Matter.Bodies.rectangle(810, 300, 20, 640, {isStatic: true}));
 				edges.push(Matter.Bodies.rectangle(400, 610, 840, 20, {isStatic: true}));
-
-				Matter.World.add(engine.world, [boxA, boxB]);
 				Matter.World.add(engine.world, edges);
+
+				if(individual) {
+					individual.car.setPosition(400, 300);
+					Matter.World.add(engine.world, individual.car.body);
+				}
+
+				var mouse = Matter.Mouse.create(render.canvas),
+				mouseConstraint = Matter.MouseConstraint.create(engine, {
+					mouse: mouse,
+					constraint: {
+						stiffness: 0.2
+					}
+				});
+
+				Matter.World.add(engine.world, mouseConstraint);
+				render.mouse = mouse;
 			};
 
 			function tick(time) {
 				Matter.Engine.update(engine, 1000 / 60);
 				Matter.Render.world(render);
+
+				document.querySelector('#car').innerHTML = "steer: " + a.car.steer.toFixed(2) +
+														   " | localVelocity: {x: " + a.car.localVelocity.x.toFixed(2) + ", y: " + a.car.localVelocity.y.toFixed(2) + "}" +
+														   " | engine: " + a.car.engineForce +
+														   " | braking: " + a.car.brakingForce;
+				document.querySelector('#inputs').innerHTML = JSON.stringify(inputs);
 
 				tickId = requestAnimFrame(tick);
 			};
@@ -180,6 +250,14 @@
 
 			var a = new Individual();
 			tick();
+
+			document.addEventListener('keydown', function(e) {
+				inputs['key' + e.keyCode] = true;
+			});
+
+			document.addEventListener('keyup', function(e) {
+				inputs['key' + e.keyCode] = false;
+			});
 		</script>
 	</body>
 </html>
