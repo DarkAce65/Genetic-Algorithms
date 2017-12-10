@@ -2,6 +2,12 @@
 # yarn lockfile v1
 
 
-matter-js@^0.14.0:
-  version "0.14.0"
-  resolved "https://registry.yarnpkg.com/matter-js/-/matter-js-0.14.0.tgz#413858ebb76613161579a0415cb9017ad4b5dcae"
+p2@^0.7.1:
+  version "0.7.1"
+  resolved "https://registry.yarnpkg.com/p2/-/p2-0.7.1.tgz#25f2474d9bc3a6d3140a1da26a67c9e118ac9543"
+  dependencies:
+    poly-decomp "0.1.1"
+
+poly-decomp@0.1.1:
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/poly-decomp/-/poly-decomp-0.1.1.tgz#9f68c4fa558663791c9ba4c2df7283f3096c23c9"

@@ -5,7 +5,7 @@
 		<meta charset="utf-8">
 		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<script type="text/javascript" src="node_modules/matter-js/build/matter.min.js"></script>
+		<script type="text/javascript" src="node_modules/p2/build/p2.js"></script>
 		<style type="text/css">
 			html, body {
 				margin: 0;
@@ -18,14 +18,16 @@
 				background-color: #121212;
 				text-align: center;
 			}
+
+			#canvas {
+				border: 1px solid white;
+			}
 		</style>
 	</head>
 	<body>
 		<div style="margin: 20px;">
 			<canvas id="canvas"></canvas>
 		</div>
-		<div id="car"></div>
-		<div id="inputs"></div>
 		<script type="text/javascript">
 			'use strict';
 
@@ -54,7 +56,14 @@
 				return array;
 			}
 
-			var inputs = {};
+			var inputs = {
+				'32': 0,
+				'37': 0,
+				'38': 0,
+				'39': 0,
+				'40': 0
+			};
+
 			var tickId = false;
 			var numHiddenNodes = 5;
 			var mutationChance = 0.01;
@@ -65,21 +74,10 @@
 			canvas.width = width;
 			canvas.height = height;
 			var ctx = canvas.getContext('2d');
+		    ctx.scale(1, -1);
+		    ctx.translate(0, -height);
 
-			var engine = Matter.Engine.create();
-			engine.world.gravity.y = 0;
-			var render = Matter.Render.create({
-				canvas: canvas,
-				engine: engine,
-				options: {
-					showAngleIndicator: true,
-					showBounds: true,
-					showCollisions: true,
-					showConvexHulls: true,
-					showSeparations: true,
-					showVelocity: true
-				}
-			});
+			var world = new p2.World({gravity: [0, 0]});
 
 			var data = [];
 			var imageData = [];
@@ -121,94 +119,85 @@
 				}
 
 				this.fitness = 0;
-				this.car = new Car();
+				this.car = new Car(20, 40);
 				resetSimulation(this);
-				Matter.Events.on(engine, 'afterUpdate', function(event) {
-					var engine = event.source;
-					this.car.update();
-				}.bind(this));
-				// this.fitness = this.calculateFitness();
 			};
 
-			var Car = function(width, height) {
-				if(!width) {
-					width = 30;
-				}
-				if(!height) {
-					height = 60;
-				}
+			var Car = function(bodyWidth, bodyHeight) {
+				var chassisBody = new p2.Body({position: [400, 300], mass: 1});
+				var boxShape = new p2.Box({width: bodyWidth, height: bodyHeight});
+				chassisBody.addShape(boxShape);
 
-				var chassis = Matter.Bodies.rectangle(0, 0, width, height);
-				var parts = [chassis];
-				var wheelOptions = {density: 0};
-				parts.push(Matter.Bodies.rectangle(-width / 2, -(height - 20) / 2, 5, 10, wheelOptions));
-				parts.push(Matter.Bodies.rectangle(width / 2, -(height - 20) / 2, 5, 10, wheelOptions));
-				parts.push(Matter.Bodies.rectangle(width / 2, (height - 20) / 2, 5, 10, wheelOptions));
-				parts.push(Matter.Bodies.rectangle(-width / 2, (height - 20) / 2, 5, 10, wheelOptions));
+				var vehicle = new p2.TopDownVehicle(chassisBody);
+				var flWheel = vehicle.addWheel({localPosition: [-bodyWidth / 2,  bodyHeight / 2]});
+				var frWheel = vehicle.addWheel({localPosition: [ bodyWidth / 2,  bodyHeight / 2]});
+				var blWheel = vehicle.addWheel({localPosition: [-bodyWidth / 2, -bodyHeight / 2]});
+				var brWheel = vehicle.addWheel({localPosition: [ bodyWidth / 2, -bodyHeight / 2]});
+				flWheel.setSideFriction(400);
+				frWheel.setSideFriction(400);
+				blWheel.setSideFriction(300);
+				brWheel.setSideFriction(300);
 
+				blWheel.setBrakeForce(10);
+				brWheel.setBrakeForce(10);
 
-				this.body = Matter.Body.create({parts: parts});
-				Matter.Body.scale(this.body, 4, 4);
-
+				this.tdv = vehicle;
+				this.chassis = {
+					body: chassisBody,
+					box: boxShape
+				};
+				this.wheels = [flWheel, frWheel, blWheel, brWheel];
 				this.steer = 0;
-				this.localVelocity = {x: 0, y: 0};
-				this.engineForce = 0;
-				this.brakingForce = 0;
-			};
-
-			Car.prototype.setPosition = function(x, y) {
-				Matter.Body.setPosition(this.body, {x: x, y: y});
+				this.throttle = 0;
+				this.brake = 0;
 			};
 
 			Car.prototype.update = function() {
-				var left = inputs['key37'] ? -0.75 : 0;
-				var right = inputs['key39'] ? 0.75 : 0;
-				this.steer = this.steer * 0.9 + (left + right) * 0.1;
-				Matter.Body.setAngle(this.body.parts[2], this.steer);
-				Matter.Body.setAngle(this.body.parts[3], this.steer);
+				var steerValue = 0.63 * -this.steer;
+				this.wheels[0].steerValue = steerValue;
+				this.wheels[1].steerValue = steerValue;
 
-				this.localVelocity = Matter.Vector.rotate(this.body.velocity, this.body.angle);
+				var engineForce = this.throttle > 0 ? 150 * this.throttle : 50 * this.throttle;
+				this.wheels[2].engineForce = engineForce;
+				this.wheels[3].engineForce = engineForce;
+
+				var brakeForce = this.throttle > 0 ? 300 * this.brake : 100 * this.brake;
+				this.wheels[2].setBrakeForce(brakeForce);
+				this.wheels[3].setBrakeForce(brakeForce);
+			};
+
+			Car.prototype.draw = function() {
+				ctx.strokeStyle = 'white';
+				ctx.beginPath();
+		        var x = this.chassis.body.position[0] - this.chassis.box.width / 2;
+		        var y = this.chassis.body.position[1] - this.chassis.box.height / 2;
+		        ctx.save();
+		        ctx.translate(x, y);
+		        ctx.rotate(this.chassis.body.angle);
+		        ctx.rect(0, 0, this.chassis.box.width, this.chassis.box.height);
+		        ctx.stroke();
+		        ctx.restore();
 			};
 
 			function resetSimulation(individual) {
-				Matter.Events.off(engine);
-				Matter.World.clear(engine.world);
-				Matter.Engine.clear(engine);
-
-				var edges = [];
-				edges.push(Matter.Bodies.rectangle(-10, 300, 20, 640, {isStatic: true}));
-				edges.push(Matter.Bodies.rectangle(400, -10, 840, 20, {isStatic: true}));
-				edges.push(Matter.Bodies.rectangle(810, 300, 20, 640, {isStatic: true}));
-				edges.push(Matter.Bodies.rectangle(400, 610, 840, 20, {isStatic: true}));
-				Matter.World.add(engine.world, edges);
+				world.clear();
+				world.gravity = [0, 0];
 
 				if(individual) {
-					individual.car.setPosition(400, 300);
-					Matter.World.add(engine.world, individual.car.body);
+					world.addBody(individual.car.chassis.body);
+					individual.car.tdv.addToWorld(world);
 				}
-
-				var mouse = Matter.Mouse.create(render.canvas),
-				mouseConstraint = Matter.MouseConstraint.create(engine, {
-					mouse: mouse,
-					constraint: {
-						stiffness: 0.2
-					}
-				});
-
-				Matter.World.add(engine.world, mouseConstraint);
-				render.mouse = mouse;
 			};
 
+			var lastTime;
 			function tick(time) {
-				Matter.Engine.update(engine, 1000 / 60);
-				Matter.Render.world(render);
+				var dt = lastTime ? (time - lastTime) / 1000 : 0;
+				world.step(1 / 60);
+				ctx.clearRect(0, 0, width, height);
+				a.car.update();
+				a.car.draw();
 
-				document.querySelector('#car').innerHTML = "steer: " + a.car.steer.toFixed(2) +
-														   " | localVelocity: {x: " + a.car.localVelocity.x.toFixed(2) + ", y: " + a.car.localVelocity.y.toFixed(2) + "}" +
-														   " | engine: " + a.car.engineForce +
-														   " | braking: " + a.car.brakingForce;
-				document.querySelector('#inputs').innerHTML = JSON.stringify(inputs);
-
+				lastTime = time;
 				tickId = requestAnimFrame(tick);
 			};
 
@@ -252,11 +241,19 @@
 			tick();
 
 			document.addEventListener('keydown', function(e) {
-				inputs['key' + e.keyCode] = true;
+				if(inputs[e.keyCode] == 0) {
+					inputs[e.keyCode] = 1;
+					a.car.steer = inputs[39] - inputs[37];
+					a.car.throttle = (inputs[38]- inputs[40]);
+					a.car.brake = inputs[32];
+				}
 			});
 
 			document.addEventListener('keyup', function(e) {
-				inputs['key' + e.keyCode] = false;
+				inputs[e.keyCode] = 0;
+				a.car.steer = inputs[39] - inputs[37];
+				a.car.throttle = (inputs[38]- inputs[40]);
+				a.car.brake = inputs[32];
 			});
 		</script>
 	</body>
