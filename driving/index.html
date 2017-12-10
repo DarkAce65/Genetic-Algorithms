@@ -138,8 +138,8 @@
 				blWheel.setSideFriction(300);
 				brWheel.setSideFriction(300);
 
-				blWheel.setBrakeForce(10);
-				brWheel.setBrakeForce(10);
+				flWheel.setBrakeForce(20);
+				frWheel.setBrakeForce(20);
 
 				this.tdv = vehicle;
 				this.chassis = {
@@ -157,11 +157,11 @@
 				this.wheels[0].steerValue = steerValue;
 				this.wheels[1].steerValue = steerValue;
 
-				var engineForce = this.throttle > 0 ? 150 * this.throttle : 50 * this.throttle;
+				var engineForce = this.throttle > 0 ? 150 * this.throttle : 75 * this.throttle;
 				this.wheels[2].engineForce = engineForce;
 				this.wheels[3].engineForce = engineForce;
 
-				var brakeForce = this.throttle > 0 ? 300 * this.brake : 100 * this.brake;
+				var brakeForce = this.throttle > 0 ? 300 * this.brake : 150 * this.brake;
 				this.wheels[2].setBrakeForce(brakeForce);
 				this.wheels[3].setBrakeForce(brakeForce);
 			};
