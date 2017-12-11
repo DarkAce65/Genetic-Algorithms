@@ -28,7 +28,7 @@
 		<div style="margin: 20px;">
 			<canvas id="canvas"></canvas>
 		</div>
-		<div id="car"></div>
+		<div id="net" style="font-family: monospace;"></div>
 		<script type="text/javascript">
 			'use strict';
 
@@ -65,10 +65,13 @@
 				'40': 0
 			};
 
-			var tickId = false;
+			var numInputNodes = 3;
 			var numHiddenNodes = 5;
+			var numOutputNodes = 3;
+			var tickId = false;
 			var mutationChance = 0.01;
 			var mutationAmount = 0.1;
+			var currentIndividual;
 			var width = 800;
 			var height = 600;
 			var canvas = document.getElementById('canvas');
@@ -84,8 +87,6 @@
 			var imageData = [];
 
 			var Individual = function(p1, p2) {
-				this.data = [];
-
 				if(p1 && p2) {
 					for(var i = 0; i < numTriangles; i++) {
 						var inherited = [];
@@ -110,18 +111,57 @@
 				}
 				else {
 					this.inputLayerWeights = [];
-					for(var i = 0; i < numHiddenNodes * 3; i++) {
-						this.inputLayerWeights[i] = Math.random();
+					for(var i = 0; i < numInputNodes * numHiddenNodes; i++) {
+						this.inputLayerWeights.push(Math.random());
 					}
-					this.hiddenLayer = [];
-					for(var i = 0; i < numHiddenNodes * 2; i++) {
-						this.hiddenLayer[i] = Math.random();
+					this.hiddenLayerWeights = [];
+					for(var i = 0; i < numHiddenNodes * numOutputNodes; i++) {
+						this.hiddenLayerWeights.push(Math.random());
 					}
 				}
 
 				this.fitness = 0;
 				this.car = new Car(20, 40);
-				resetSimulation(this);
+			};
+
+			Individual.prototype.update = function() {
+				this.car.update();
+
+				var inputLayer = [0, 0, 0];
+				var hiddenLayer = [0, 0, 0, 0, 0];
+				var outputLayer = [0, 0, 0];
+
+				for(var i = 0; i < numHiddenNodes; i++) {
+					for(var j = 0; j < numInputNodes; j++) {
+						hiddenLayer[i] += inputLayer[j] * this.inputLayerWeights[i * numInputNodes + j];
+					}
+				}
+
+				for(var i = 0; i < numOutputNodes; i++) {
+					for(var j = 0; j < numHiddenNodes; j++) {
+						outputLayer[i] += hiddenLayer[j] * this.hiddenLayerWeights[i * numHiddenNodes + j];
+					}
+				}
+				var net = "";
+				for(var i = 0; i < numInputNodes; i++) {
+					net += inputLayer[i].toFixed(2);
+					net += ",";
+				}
+				net += "<br>";
+				for(var i = 0; i < numHiddenNodes; i++) {
+					net += hiddenLayer[i].toFixed(2);
+					net += ",";
+				}
+				net += "<br>";
+				for(var i = 0; i < numOutputNodes; i++) {
+					net += outputLayer[i].toFixed(2);
+					net += ",";
+				}
+				document.querySelector('#net').innerHTML = net;
+
+				this.car.steer = outputLayer[0] * 2 - 1;
+				this.car.throttle = outputLayer[1];
+				this.car.brake = outputLayer[2];
 			};
 
 			var Car = function(bodyWidth, bodyHeight) {
@@ -220,8 +260,8 @@
 				var dt = lastTime ? (time - lastTime) / 1000 : 0;
 				world.step(1 / 60, dt, 10);
 				ctx.clearRect(0, 0, width, height);
-				a.car.update();
-				a.car.draw();
+				currentIndividual.update();
+				currentIndividual.car.draw();
 
 				lastTime = time;
 				tickId = requestAnimFrame(tick);
@@ -263,7 +303,8 @@
 				}
 			}
 
-			var a = new Individual();
+			currentIndividual = new Individual();
+			resetSimulation(currentIndividual);
 			tick();
 		</script>
 	</body>
