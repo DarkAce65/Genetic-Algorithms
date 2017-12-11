@@ -212,19 +212,22 @@
 
 			Car.prototype.draw = function() {
 				ctx.strokeStyle = 'white';
-				ctx.beginPath();
-		        var x = this.chassis.body.position[0] - this.chassis.box.width / 2;
-		        var y = this.chassis.body.position[1] - this.chassis.box.height / 2;
+		        var x = this.chassis.body.position[0];
+		        var y = this.chassis.body.position[1];
+				var w = this.chassis.box.width;
+				var h = this.chassis.box.height;
 
 		        ctx.save();
 		        ctx.translate(x, y);
 		        ctx.rotate(this.chassis.body.angle);
 
-		        ctx.rect(0, 0, this.chassis.box.width, this.chassis.box.height);
-		        ctx.translate(this.chassis.box.width / 2, this.chassis.box.height / 2);
+				ctx.translate(-w / 2, -h / 2);
+				ctx.beginPath();
+		        ctx.rect(0, 0, w, h);
+				ctx.translate(w / 2, h / 2);
 
-				var wheelWidth = this.chassis.box.width / 6;
-				var wheelHeight = this.chassis.box.height / 6;
+				var wheelWidth = w / 6;
+				var wheelHeight = h / 6;
 				for(var i = 0; i < this.wheels.length; i++) {
 					var w = this.wheels[i];
 					var x = w.localPosition[0];
@@ -241,7 +244,7 @@
 			        ctx.restore();
 				}
 
-		        ctx.stroke();
+				ctx.stroke();
 		        ctx.restore();
 			};
 
