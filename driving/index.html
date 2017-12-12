@@ -65,13 +65,15 @@
 				'40': 0
 			};
 
+			var tickId = false;
 			var numInputNodes = 3;
 			var numHiddenNodes = 5;
 			var numOutputNodes = 3;
-			var tickId = false;
 			var mutationChance = 0.01;
 			var mutationAmount = 0.1;
+
 			var currentIndividual;
+
 			var width = 800;
 			var height = 600;
 			var canvas = document.getElementById('canvas');
@@ -82,9 +84,8 @@
 		    ctx.translate(0, -height);
 
 			var world = new p2.World({gravity: [0, 0]});
-
-			var data = [];
-			var imageData = [];
+			var wallColGroup = 2;
+			var walls = [];
 
 			var Individual = function(p1, p2) {
 				if(p1 && p2) {
@@ -112,11 +113,11 @@
 				else {
 					this.inputLayerWeights = [];
 					for(var i = 0; i < numInputNodes * numHiddenNodes; i++) {
-						this.inputLayerWeights.push(Math.random());
+						this.inputLayerWeights.push(Math.random() - 0.5);
 					}
 					this.hiddenLayerWeights = [];
 					for(var i = 0; i < numHiddenNodes * numOutputNodes; i++) {
-						this.hiddenLayerWeights.push(Math.random());
+						this.hiddenLayerWeights.push(Math.random() - 0.5);
 					}
 				}
 
@@ -124,10 +125,10 @@
 				this.car = new Car(20, 40);
 			};
 
-			Individual.prototype.update = function() {
+			Individual.prototype.update = function(dt) {
 				this.car.update();
 
-				var inputLayer = [0, 0, 0];
+				var inputLayer = this.car.getDistances();
 				var hiddenLayer = [0, 0, 0, 0, 0];
 				var outputLayer = [0, 0, 0];
 
@@ -141,6 +142,10 @@
 					for(var j = 0; j < numHiddenNodes; j++) {
 						outputLayer[i] += hiddenLayer[j] * this.hiddenLayerWeights[i * numHiddenNodes + j];
 					}
+				}
+
+				for(var i = 0; i < numOutputNodes; i++) {
+					outputLayer[i] = Math.min(Math.max(0, outputLayer[i]), 1);
 				}
 				var net = "";
 				for(var i = 0; i < numInputNodes; i++) {
@@ -157,16 +162,21 @@
 					net += outputLayer[i].toFixed(2);
 					net += ",";
 				}
-				document.querySelector('#net').innerHTML = net;
 
-				this.car.steer = outputLayer[0] * 2 - 1;
+				this.car.steer = outputLayer[0];
 				this.car.throttle = outputLayer[1];
 				this.car.brake = outputLayer[2];
+				this.fitness += this.car.speed * dt / 1000;
+				document.querySelector('#net').innerHTML = net + '<br>fitness: ' + this.fitness.toFixed(2);
 			};
 
 			var Car = function(bodyWidth, bodyHeight) {
 				var chassisBody = new p2.Body({position: [400, 300], mass: 1});
-				var boxShape = new p2.Box({width: bodyWidth, height: bodyHeight});
+				var boxShape = new p2.Box({
+					width: bodyWidth,
+					height: bodyHeight,
+					collisionMask: wallColGroup
+				});
 				chassisBody.addShape(boxShape);
 
 				var vehicle = new p2.TopDownVehicle(chassisBody);
@@ -182,21 +192,63 @@
 				flWheel.setBrakeForce(20);
 				frWheel.setBrakeForce(20);
 
+				var lSensor = new p2.Ray({
+					mode: p2.Ray.CLOSEST,
+					collisionMask: wallColGroup
+				});
+				lSensor.update();
+				var fSensor = new p2.Ray({
+					mode: p2.Ray.CLOSEST,
+					collisionMask: wallColGroup
+				});
+				var rSensor = new p2.Ray({
+					mode: p2.Ray.CLOSEST,
+					collisionMask: wallColGroup
+				});
+
 				this.tdv = vehicle;
 				this.chassis = {
 					body: chassisBody,
 					box: boxShape
 				};
 				this.wheels = [flWheel, frWheel, blWheel, brWheel];
+				this.lSensor = lSensor;
+				this.fSensor = fSensor;
+				this.rSensor = rSensor;
+
 				this.speed = 0;
-				this.steer = 0;
+				this.steer = 0.5;
 				this.throttle = 0;
 				this.brake = 0;
 			};
 
+			Car.prototype.getDistances = function() {
+				var distances = [1, 1, 1];
+				var result = new p2.RaycastResult();
+				world.raycast(result, this.lSensor);
+				drawRayResult(result, this.lSensor);
+				if(result.hasHit()) {
+					distances[0] = result.getHitDistance(this.lSensor) / 75;
+				}
+				result.reset();
+				world.raycast(result, this.fSensor);
+				drawRayResult(result, this.fSensor);
+				if(result.hasHit()) {
+					distances[1] = result.getHitDistance(this.fSensor) / 75;
+				}
+				result.reset();
+				world.raycast(result, this.rSensor);
+				drawRayResult(result, this.rSensor);
+				if(result.hasHit()) {
+					distances[2] = result.getHitDistance(this.rSensor) / 75;
+				}
+
+				return distances;
+			};
+
 			Car.prototype.update = function() {
 				this.speed = (this.wheels[2].getSpeed() + this.wheels[3].getSpeed()) / 2;
-				var steerValue = 0.63 * -this.steer;
+				var steerValue = 0.63 * -(this.steer * 2 - 1);
 				var engineForce = 150 * this.throttle;
 				var brakeForce = 150 * this.brake;
 
@@ -208,6 +260,31 @@
 
 				this.wheels[2].setBrakeForce(brakeForce);
 				this.wheels[3].setBrakeForce(brakeForce);
+
+				var w = this.chassis.box.width;
+				var h = this.chassis.box.height;
+				var sensorPositions = [];
+				sensorPositions.push([-w / 2, h / 2]);
+				sensorPositions.push([     0, h / 2]);
+				sensorPositions.push([ w / 2, h / 2]);
+				sensorPositions.push([-w / 2 - 45, h / 2 + 60]);
+				sensorPositions.push([     0     , h / 2 + 75]);
+				sensorPositions.push([ w / 2 + 45, h / 2 + 60]);
+				for(var i = 0; i < sensorPositions.length; i++) {
+					p2.vec2.rotate(sensorPositions[i], sensorPositions[i], this.chassis.body.angle);
+					p2.vec2.add(sensorPositions[i], sensorPositions[i], this.chassis.body.position);
+				}
+
+				this.lSensor.from = sensorPositions[0];
+				this.lSensor.to = sensorPositions[3];
+				this.fSensor.from = sensorPositions[1];
+				this.fSensor.to = sensorPositions[4];
+				this.rSensor.from = sensorPositions[2];
+				this.rSensor.to = sensorPositions[5];
+
+				this.lSensor.update();
+				this.fSensor.update();
+				this.rSensor.update();
 			};
 
 			Car.prototype.draw = function() {
@@ -236,7 +313,7 @@
 					ctx.save();
 					ctx.translate(x, y);
 					if(i < 2) {
-						ctx.rotate(0.63 * -this.steer);
+						ctx.rotate(0.63 * -(this.steer * 2 - 1));
 					}
 			        ctx.translate(-wheelWidth / 2, -wheelHeight / 2);
 
@@ -257,6 +334,29 @@
 					individual.car.tdv.addToWorld(world);
 				}
 			};
+
+			function drawRayResult(result, ray){
+				ctx.strokeStyle = 'skyblue';
+				ctx.beginPath();
+				ctx.moveTo(ray.from[0], ray.from[1]);
+				ctx.lineTo(ray.to[0], ray.to[1]);
+				ctx.stroke();
+
+				ctx.strokeStyle = 'yellow';
+				var hitPoint = p2.vec2.create();
+				result.getHitPoint(hitPoint, ray);
+
+				if(result.hasHit()) {
+					ctx.beginPath();
+					ctx.arc(hitPoint[0], hitPoint[1], 5, 0, 2 * Math.PI);
+					ctx.stroke();
+				}
+
+				ctx.beginPath();
+				ctx.moveTo(hitPoint[0], hitPoint[1]);
+				ctx.lineTo(hitPoint[0] + result.normal[0] * 10, hitPoint[1] + result.normal[1] * 10);
+				ctx.stroke();
+			}
 
 			var lastTime;
 			function tick(time) {
