@@ -275,8 +275,8 @@
 				this.wheels[2].setBrakeForce(brakeForce);
 				this.wheels[3].setBrakeForce(brakeForce);
 
-				var w = this.chassis.box.width;
-				var h = this.chassis.box.height;
+				var w = this.chassis.box.width * 9 / 10;
+				var h = this.chassis.box.height * 9 / 10;
 				var sensorPositions = [];
 				sensorPositions.push([-w / 2, h / 2]);
 				sensorPositions.push([     0, h / 2]);
