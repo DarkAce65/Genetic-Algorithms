@@ -28,6 +28,7 @@
 		<div style="margin: 20px;">
 			<canvas id="canvas"></canvas>
 		</div>
+		<div id="genetic" style="font-family: monospace;"></div>
 		<div id="net" style="font-family: monospace;"></div>
 		<script type="text/javascript">
 			'use strict';
@@ -72,6 +73,9 @@
 			var mutationChance = 0.01;
 			var mutationAmount = 0.1;
 
+			var data = [];
+			var generation = 0;
+			var genome = 0;
 			var currentIndividual;
 
 			var width = 800;
@@ -394,6 +398,18 @@
 				ctx.stroke();
 			}
 
+			function makeNewPopulation() {
+				genome = 0;
+				if(false) {
+
+				}
+				else {
+					for(var i = 0; i < 20; i++) {
+						data.push(new Individual());
+					}
+				}
+			}
+
 			var lastTime;
 			function tick(time) {
 				var dt = lastTime ? time - lastTime : 0;
@@ -407,6 +423,19 @@
 				if(currentIndividual) {
 					currentIndividual.update(dt);
 					currentIndividual.car.draw();
+
+					if(currentIndividual.finished) {
+						genome++;
+						if(genome >= data.length) {
+							generation++;
+							makeNewPopulation();
+						}
+						else {
+							currentIndividual = data[genome];
+							currentIndividual.setSimulation();
+						}
+						document.querySelector('#genetic').innerHTML = "Generation: " + generation + ", Genome: " + genome;
+					}
 				}
 
 				lastTime = time;
@@ -435,11 +464,18 @@
 
 			function start() {
 				if(!tickId) {
-					iterate();
+					currentIndividual = data[0];
+					currentIndividual.setSimulation();
+					document.querySelector('#genetic').innerHTML = "Generation: " + generation + ", Genome: " + genome;
+					tick();
 				}
 			}
 
 			function reset() {
+				generation = 0;
+				genome = 0;
+				buildTrack();
+
 				cancelAnimFrame(tickId);
 				tickId = false;
 
@@ -449,8 +485,7 @@
 				}
 			}
 
-			buildTrack();
-			tick();
+			reset();
 		</script>
 	</body>
 </html>
