@@ -121,8 +121,21 @@
 					}
 				}
 
+				this.prevFitness = 0;
 				this.fitness = 0;
 				this.car = new Car(20, 40);
+				this.finished = false;
+			};
+
+			Individual.prototype.setSimulation = function() {
+				world.clear();
+				world.gravity = [0, 0];
+
+				addTrack();
+
+				world.addBody(this.car.chassis.body);
+				this.car.tdv.addToWorld(world);
+				currentIndividual = this;
 			};
 
 			Individual.prototype.update = function(dt) {
@@ -166,6 +179,7 @@
 				this.car.steer = outputLayer[0];
 				this.car.throttle = outputLayer[1];
 				this.car.brake = outputLayer[2];
+				this.prevFitness = this.fitness;
 				this.fitness += this.car.speed * dt / 1000;
 				document.querySelector('#net').innerHTML = net + '<br>fitness: ' + this.fitness.toFixed(2);
 			};
@@ -325,15 +339,37 @@
 		        ctx.restore();
 			};
 
-			function resetSimulation(individual) {
-				world.clear();
-				world.gravity = [0, 0];
-
-				if(individual) {
-					world.addBody(individual.car.chassis.body);
-					individual.car.tdv.addToWorld(world);
+			function buildTrack() {
+				for(var i = 0; i < 10; i++) {
+					var wall = new p2.Body({
+						position: [width * Math.random(), height * Math.random()],
+						angle: 2 * Math.PI * Math.random()
+					});
+					wall.addShape(new p2.Box({
+						width: 100 * Math.random() + 30,
+						height: 100 * Math.random() + 30,
+						collisionGroup: wallColGroup
+					}));
+					walls[i] = wall;
 				}
-			};
+			}
+
+			function addTrack() {
+				for(var i = 0; i < walls.length; i++) {
+					world.addBody(walls[i]);
+				}
+			}
+
+			function drawWall(wall) {
+				ctx.strokeStyle = 'white';
+				ctx.beginPath();
+				ctx.save();
+				ctx.translate(wall.position[0], wall.position[1]);
+				ctx.rotate(wall.angle);
+				ctx.rect(-wall.shapes[0].width / 2, -wall.shapes[0].height / 2, wall.shapes[0].width, wall.shapes[0].height);
+				ctx.stroke();
+				ctx.restore();
+			}
 
 			function drawRayResult(result, ray){
 				ctx.strokeStyle = 'skyblue';
@@ -360,15 +396,22 @@
 
 			var lastTime;
 			function tick(time) {
-				var dt = lastTime ? (time - lastTime) / 1000 : 0;
-				world.step(1 / 60, dt, 10);
+				var dt = lastTime ? time - lastTime : 0;
+				world.step(1 / 60, dt / 1000, 10);
 				ctx.clearRect(0, 0, width, height);
-				currentIndividual.update();
-				currentIndividual.car.draw();
+
+				for(var i = 0; i < walls.length; i++) {
+					drawWall(walls[i]);
+				}
+
+				if(currentIndividual) {
+					currentIndividual.update(dt);
+					currentIndividual.car.draw();
+				}
 
 				lastTime = time;
 				tickId = requestAnimFrame(tick);
-			};
+			}
 
 			function iterate() {
 				var datalen = data.length;
@@ -406,8 +449,7 @@
 				}
 			}
 
-			currentIndividual = new Individual();
-			resetSimulation(currentIndividual);
+			buildTrack();
 			tick();
 		</script>
 	</body>
