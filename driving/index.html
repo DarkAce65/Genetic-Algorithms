@@ -70,13 +70,15 @@
 			var numInputNodes = 3;
 			var numHiddenNodes = 5;
 			var numOutputNodes = 3;
-			var mutationChance = 0.01;
+			var mutationChance = 0.1;
 			var mutationAmount = 0.1;
+			var speedAvgWindow = 50;
 
 			var data = [];
 			var generation = 0;
 			var genome = 0;
 			var currentIndividual;
+			var bestFitness = 0;
 
 			var width = 800;
 			var height = 600;
@@ -92,58 +94,85 @@
 			var walls = [];
 
 			var Individual = function(p1, p2) {
+				this.inputLayerWeights = [];
+				this.hiddenLayerWeights = [];
+
 				if(p1 && p2) {
-					for(var i = 0; i < numTriangles; i++) {
-						var inherited = [];
+					for(var i = 0; i < numInputNodes * numHiddenNodes; i++) {
 						if(Math.random() < 0.5) {
-							inherited = p1.data;
+							this.inputLayerWeights.push(p1.inputLayerWeights[i]);
 						}
 						else {
-							inherited = p2.data;
+							this.inputLayerWeights.push(p2.inputLayerWeights[i]);
 						}
-						for(var j = 0; j < geneSize; j++) {
-							var value = inherited[i * geneSize + j];
-							if(Math.random() < mutationChance) {
-								value += (Math.random() * 2 - 1) * mutationAmount;
-								value = Math.max(0, Math.min(1, value));
-							}
-							if(isNaN(value)) {
-								value = Math.random();
-							}
-							this.data.push(value);
+
+						if(Math.random() < mutationChance) {
+							var v = this.inputLayerWeights[i];
+							v += (Math.random() * 2 - 1) * mutationAmount;
+							v = Math.max(-1, Math.min(1, v));
+							this.inputLayerWeights[i] = v;
+						}
+					}
+					for(var i = 0; i < numHiddenNodes * numOutputNodes; i++) {
+						if(Math.random() < 0.5) {
+							this.hiddenLayerWeights.push(p1.hiddenLayerWeights[i]);
+						}
+						else {
+							this.hiddenLayerWeights.push(p2.hiddenLayerWeights[i]);
+						}
+
+						if(Math.random() < mutationChance) {
+							var v = this.inputLayerWeights[i];
+							v += (Math.random() * 2 - 1) * mutationAmount;
+							v = Math.max(-1, Math.min(1, v));
+							this.inputLayerWeights[i] = v;
 						}
 					}
 				}
 				else {
-					this.inputLayerWeights = [];
 					for(var i = 0; i < numInputNodes * numHiddenNodes; i++) {
-						this.inputLayerWeights.push(Math.random() - 0.5);
+						this.inputLayerWeights.push(Math.random() * 2 - 1);
 					}
-					this.hiddenLayerWeights = [];
 					for(var i = 0; i < numHiddenNodes * numOutputNodes; i++) {
-						this.hiddenLayerWeights.push(Math.random() - 0.5);
+						this.hiddenLayerWeights.push(Math.random() * 2 - 1);
 					}
 				}
 
 				this.prevFitness = 0;
 				this.fitness = 0;
-				this.car = new Car(20, 40);
 				this.finished = false;
+				this.car = new Car(20, 40);
 			};
 
 			Individual.prototype.setSimulation = function() {
 				world.clear();
 				world.gravity = [0, 0];
 
+				world.on('beginContact', function(event) {
+					currentIndividual.finished = true;
+					bestFitness = Math.max(bestFitness, currentIndividual.fitness);
+				});
+
 				addTrack();
 
+				this.prevFitness = 0;
+				this.fitness = 0;
+				this.finished = false;
+
+				this.car = new Car(20, 40);
 				world.addBody(this.car.chassis.body);
 				this.car.tdv.addToWorld(world);
+
 				currentIndividual = this;
 			};
 
 			Individual.prototype.update = function(dt) {
 				this.car.update();
+
+				if(this.car.speeds.length == speedAvgWindow && this.car.avgSpeed < 1) {
+					this.finished = true;
+					bestFitness = Math.max(bestFitness, this.fitness);
+				}
 
 				var inputLayer = this.car.getDistances();
 				var hiddenLayer = [0, 0, 0, 0, 0];
@@ -164,28 +193,28 @@
 				for(var i = 0; i < numOutputNodes; i++) {
 					outputLayer[i] = Math.min(Math.max(0, outputLayer[i]), 1);
 				}
-				var net = "";
+				var net = '';
 				for(var i = 0; i < numInputNodes; i++) {
 					net += inputLayer[i].toFixed(2);
-					net += ",";
+					net += ',';
 				}
-				net += "<br>";
+				net += '<br>';
 				for(var i = 0; i < numHiddenNodes; i++) {
 					net += hiddenLayer[i].toFixed(2);
-					net += ",";
+					net += ',';
 				}
-				net += "<br>";
+				net += '<br>';
 				for(var i = 0; i < numOutputNodes; i++) {
 					net += outputLayer[i].toFixed(2);
-					net += ",";
+					net += ',';
 				}
 
 				this.car.steer = outputLayer[0];
 				this.car.throttle = outputLayer[1];
 				this.car.brake = outputLayer[2];
 				this.prevFitness = this.fitness;
-				this.fitness += this.car.speed * dt / 1000;
-				document.querySelector('#net').innerHTML = net + '<br>fitness: ' + this.fitness.toFixed(2);
+				this.fitness += this.car.avgSpeed * dt / 1000;
+				document.querySelector('#net').innerHTML = net + '<br>speed: ' + this.car.avgSpeed.toFixed(2) + ', fitness: ' + this.fitness.toFixed(2) + '<br>best fitness: ' + bestFitness.toFixed(2);
 			};
 
 			var Car = function(bodyWidth, bodyHeight) {
@@ -234,7 +263,8 @@
 				this.fSensor = fSensor;
 				this.rSensor = rSensor;
 
-				this.speed = 0;
+				this.speeds = [];
+				this.avgSpeed = 0;
 				this.steer = 0.5;
 				this.throttle = 0;
 				this.brake = 0;
@@ -265,7 +295,17 @@
 			};
 
 			Car.prototype.update = function() {
-				this.speed = (this.wheels[2].getSpeed() + this.wheels[3].getSpeed()) / 2;
+				this.speeds.push((this.wheels[2].getSpeed() + this.wheels[3].getSpeed()) / 2);
+				if(this.speeds.length > speedAvgWindow) {
+					this.speeds.shift();
+				}
+
+				var sum = 0;
+				for(var i = 0; i < this.speeds.length; i++) {
+					sum += this.speeds[i];
+				}
+				this.avgSpeed = sum / this.speeds.length;
+
 				var steerValue = 0.63 * -(this.steer * 2 - 1);
 				var engineForce = 150 * this.throttle;
 				var brakeForce = 150 * this.brake;
@@ -318,7 +358,7 @@
 
 				ctx.translate(-w / 2, -h / 2);
 				ctx.beginPath();
-		        ctx.rect(0, 0, w, h);
+				ctx.rect(0, 0, w, h);
 				ctx.translate(w / 2, h / 2);
 
 				var wheelWidth = w / 6;
@@ -411,7 +451,7 @@
 				ctx.lineTo(ray.to[0], ray.to[1]);
 				ctx.stroke();
 
-				ctx.strokeStyle = 'yellow';
+				ctx.strokeStyle = 'red';
 				var hitPoint = p2.vec2.create();
 				result.getHitPoint(hitPoint, ray);
 
@@ -429,13 +469,25 @@
 
 			function makeNewPopulation() {
 				genome = 0;
-				if(false) {
-
-				}
-				else {
+				if(generation == 0) {
+					data = [];
 					for(var i = 0; i < 20; i++) {
 						data.push(new Individual());
 					}
+				}
+				else {
+					var datalen = data.length;
+					data = data.sort(function(a, b) {
+						return b.fitness - a.fitness;
+					});
+
+					var breeders = data.slice(0, Math.max(2, ~~(datalen * 0.15)));
+					data = [breeders[0]];
+					for(var i = data.length; i < datalen - 1; i++) {
+						breeders = shuffle(breeders);
+						data.push(new Individual(breeders[0], breeders[1]));
+					}
+					data.push(new Individual());
 				}
 			}
 
@@ -459,11 +511,10 @@
 							generation++;
 							makeNewPopulation();
 						}
-						else {
-							currentIndividual = data[genome];
-							currentIndividual.setSimulation();
-						}
-						document.querySelector('#genetic').innerHTML = "Generation: " + generation + ", Genome: " + genome;
+
+						currentIndividual = data[genome];
+						currentIndividual.setSimulation();
+						document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome;
 					}
 				}
 
@@ -471,47 +522,25 @@
 				tickId = requestAnimFrame(tick);
 			}
 
-			function iterate() {
-				var datalen = data.length;
-
-				data = data.sort(function(a, b) {
-					return b.fitness - a.fitness;
-				});
-
-				data[0].draw(ctx, canvas.width / width);
-				mutationAmount = 0.1 / Math.pow(data[0].fitness, 2);
-
-				var breeders = data.slice(0, Math.max(2, ~~(datalen * 0.15)));
-				data = [];
-				for(var i = data.length; i < datalen; i++) {
-					breeders = shuffle(breeders);
-					data.push(new Individual(breeders[0], breeders[1]));
-				}
-
-				tickId = requestAnimFrame(iterate);
-			}
-
 			function start() {
 				if(!tickId) {
 					currentIndividual = data[0];
 					currentIndividual.setSimulation();
-					document.querySelector('#genetic').innerHTML = "Generation: " + generation + ", Genome: " + genome;
+					document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome;
 					tick();
 				}
 			}
 
 			function reset() {
-				generation = 0;
-				genome = 0;
 				buildTrack();
 
 				cancelAnimFrame(tickId);
 				tickId = false;
 
-				data = [];
-				for(var i = 0; i < 20; i++) {
-					data.push(new Individual());
-				}
+				bestFitness = 0;
+				generation = 0;
+				genome = 0;
+				makeNewPopulation();
 			}
 
 			reset();
