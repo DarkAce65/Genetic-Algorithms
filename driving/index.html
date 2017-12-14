@@ -243,7 +243,6 @@
 					mode: p2.Ray.CLOSEST,
 					collisionMask: wallColGroup
 				});
-				lSensor.update();
 				var fSensor = new p2.Ray({
 					mode: p2.Ray.CLOSEST,
 					collisionMask: wallColGroup
@@ -524,8 +523,7 @@
 
 			function start() {
 				if(!tickId) {
-					currentIndividual = data[0];
-					currentIndividual.setSimulation();
+					data[0].setSimulation();
 					document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome;
 					tick();
 				}
@@ -536,6 +534,7 @@
 
 				cancelAnimFrame(tickId);
 				tickId = false;
+				lastTime = undefined;
 
 				bestFitness = 0;
 				generation = 0;
