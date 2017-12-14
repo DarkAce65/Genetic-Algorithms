@@ -344,18 +344,47 @@
 			};
 
 			function buildTrack() {
-				for(var i = 0; i < 10; i++) {
+				for(var i = 0; i < 20; i++) {
 					var wall = new p2.Body({
 						position: [width * Math.random(), height * Math.random()],
 						angle: 2 * Math.PI * Math.random()
 					});
 					wall.addShape(new p2.Box({
-						width: 100 * Math.random() + 30,
-						height: 100 * Math.random() + 30,
+						width: 80 * Math.random() + 30,
+						height: 80 * Math.random() + 30,
 						collisionGroup: wallColGroup
 					}));
 					walls[i] = wall;
 				}
+
+				var top = new p2.Body({position: [width / 2, 0]});
+				top.addShape(new p2.Box({
+					width: width,
+					height: 20,
+					collisionGroup: wallColGroup
+				}));
+				walls.push(top);
+				var bottom = new p2.Body({position: [width / 2, height]});
+				bottom.addShape(new p2.Box({
+					width: width,
+					height: 20,
+					collisionGroup: wallColGroup
+				}));
+				walls.push(bottom);
+				var left = new p2.Body({position: [0, height / 2]});
+				left.addShape(new p2.Box({
+					width: 20,
+					height: height,
+					collisionGroup: wallColGroup
+				}));
+				walls.push(left);
+				var right = new p2.Body({position: [width, height / 2]});
+				right.addShape(new p2.Box({
+					width: 20,
+					height: height,
+					collisionGroup: wallColGroup
+				}));
+				walls.push(right);
 			}
 
 			function addTrack() {
