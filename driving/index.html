@@ -383,6 +383,7 @@
 			};
 
 			function buildTrack() {
+				walls = [];
 				for(var i = 0; i < 20; i++) {
 					var wall = new p2.Body({
 						position: [width * Math.random(), height * Math.random()],
