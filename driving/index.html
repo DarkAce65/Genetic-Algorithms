@@ -75,6 +75,7 @@
 			var speedAvgWindow = 50;
 
 			var data = [];
+			var trails = [];
 			var generation = 0;
 			var genome = 0;
 			var currentIndividual;
@@ -160,6 +161,7 @@
 				this.finished = false;
 
 				this.car = new Car(20, 40);
+				trails.push([p2.vec2.clone(this.car.chassis.body.position)]);
 				world.addBody(this.car.chassis.body);
 				this.car.tdv.addToWorld(world);
 
@@ -214,6 +216,7 @@
 				this.car.brake = outputLayer[2];
 				this.prevFitness = this.fitness;
 				this.fitness += this.car.avgSpeed * dt / 1000;
+				trails[genome].push(p2.vec2.clone(this.car.chassis.body.position));
 				document.querySelector('#net').innerHTML = net + '<br>speed: ' + this.car.avgSpeed.toFixed(2) + ', fitness: ' + this.fitness.toFixed(2) + '<br>best fitness: ' + bestFitness.toFixed(2);
 			};
 
@@ -445,13 +448,13 @@
 			}
 
 			function drawRayResult(result, ray){
-				ctx.strokeStyle = 'skyblue';
+				ctx.strokeStyle = 'aqua';
 				ctx.beginPath();
 				ctx.moveTo(ray.from[0], ray.from[1]);
 				ctx.lineTo(ray.to[0], ray.to[1]);
 				ctx.stroke();
 
-				ctx.strokeStyle = 'red';
+				ctx.strokeStyle = 'lightseagreen';
 				var hitPoint = p2.vec2.create();
 				result.getHitPoint(hitPoint, ray);
 
@@ -468,6 +471,7 @@
 			}
 
 			function makeNewPopulation() {
+				trails = [];
 				genome = 0;
 				if(generation == 0) {
 					data = [];
@@ -500,6 +504,16 @@
 				for(var i = 0; i < walls.length; i++) {
 					drawWall(walls[i]);
 				}
+
+				ctx.strokeStyle = 'lightblue';
+				ctx.beginPath();
+				for(var i = 0; i < trails.length; i++) {
+					ctx.moveTo(trails[i][0][0], trails[i][0][1]);
+					for(var j = 1; j < trails[i].length; j++) {
+						ctx.lineTo(trails[i][j][0], trails[i][j][1]);
+					}
+				}
+				ctx.stroke();
 
 				if(currentIndividual) {
 					currentIndividual.update(dt);
