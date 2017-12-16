@@ -19,17 +19,49 @@
 				text-align: center;
 			}
 
+			button {
+				background-color: #121212;
+				color: whitesmoke;
+				border: 2px solid whitesmoke;
+				border-radius: 0;
+				padding: 7px 14px;
+				margin-left: -2px;
+				font-weight: bold;
+				cursor: pointer;
+			}
+
+			button:hover, button:focus {
+				outline: none;
+				background-color: #333333;
+			}
+
+			button:first-child {
+				margin-left: 0;
+				border-top-left-radius: 4px;
+				border-bottom-left-radius: 4px;
+			}
+
+			button:last-child {
+				border-top-right-radius: 4px;
+				border-bottom-right-radius: 4px;
+			}
+
 			#canvas {
 				border: 1px solid white;
+			}
+
+			#genetic, #net {
+				font-family: monospace;
 			}
 		</style>
 	</head>
 	<body>
 		<div style="margin: 20px;">
 			<canvas id="canvas"></canvas>
+			<div id="net">speed: 0.00, fitness: 0.00, best fitness: 0.00</div>
+			<div id="genetic">Generation: 0, Genome: 0</div>
 		</div>
-		<div id="genetic" style="font-family: monospace;"></div>
-		<div id="net" style="font-family: monospace;"></div>
+		<div><button onclick="start();">Start</button><button onclick="kill();">Kill Current Simulation</button><button onclick="reset();">Reset</button></div>
 		<script type="text/javascript">
 			'use strict';
 
@@ -151,7 +183,6 @@
 
 				world.on('beginContact', function(event) {
 					currentIndividual.finished = true;
-					bestFitness = Math.max(bestFitness, currentIndividual.fitness);
 				});
 
 				addTrack();
@@ -170,10 +201,10 @@
 
 			Individual.prototype.update = function(dt) {
 				this.car.update();
+				bestFitness = Math.max(bestFitness, this.fitness);
 
 				if(this.car.speeds.length == speedAvgWindow && this.car.avgSpeed < 1) {
 					this.finished = true;
-					bestFitness = Math.max(bestFitness, this.fitness);
 				}
 
 				var inputLayer = this.car.getDistances();
@@ -195,21 +226,6 @@
 				for(var i = 0; i < numOutputNodes; i++) {
 					outputLayer[i] = Math.min(Math.max(0, outputLayer[i]), 1);
 				}
-				var net = '';
-				for(var i = 0; i < numInputNodes; i++) {
-					net += inputLayer[i].toFixed(2);
-					net += ',';
-				}
-				net += '<br>';
-				for(var i = 0; i < numHiddenNodes; i++) {
-					net += hiddenLayer[i].toFixed(2);
-					net += ',';
-				}
-				net += '<br>';
-				for(var i = 0; i < numOutputNodes; i++) {
-					net += outputLayer[i].toFixed(2);
-					net += ',';
-				}
 
 				this.car.steer = outputLayer[0];
 				this.car.throttle = outputLayer[1];
@@ -217,7 +233,7 @@
 				this.prevFitness = this.fitness;
 				this.fitness += this.car.avgSpeed * dt / 1000;
 				trails[genome].push(p2.vec2.clone(this.car.chassis.body.position));
-				document.querySelector('#net').innerHTML = net + '<br>speed: ' + this.car.avgSpeed.toFixed(2) + ', fitness: ' + this.fitness.toFixed(2) + '<br>best fitness: ' + bestFitness.toFixed(2);
+				document.querySelector('#net').innerHTML = 'speed: ' + this.car.avgSpeed.toFixed(2) + ', fitness: ' + this.fitness.toFixed(2) + ', best fitness: ' + bestFitness.toFixed(2);
 			};
 
 			var Car = function(bodyWidth, bodyHeight) {
@@ -442,19 +458,19 @@
 				ctx.save();
 				ctx.translate(wall.position[0], wall.position[1]);
 				ctx.rotate(wall.angle);
+				ctx.clearRect(-wall.shapes[0].width / 2, -wall.shapes[0].height / 2, wall.shapes[0].width, wall.shapes[0].height);
 				ctx.rect(-wall.shapes[0].width / 2, -wall.shapes[0].height / 2, wall.shapes[0].width, wall.shapes[0].height);
 				ctx.stroke();
 				ctx.restore();
 			}
 
 			function drawRayResult(result, ray){
-				ctx.strokeStyle = 'aqua';
+				ctx.strokeStyle = 'red';
 				ctx.beginPath();
 				ctx.moveTo(ray.from[0], ray.from[1]);
 				ctx.lineTo(ray.to[0], ray.to[1]);
 				ctx.stroke();
 
-				ctx.strokeStyle = 'lightseagreen';
 				var hitPoint = p2.vec2.create();
 				result.getHitPoint(hitPoint, ray);
 
@@ -544,6 +560,12 @@
 				}
 			}
 
+			function kill() {
+				if(currentIndividual) {
+					currentIndividual.finished = true;
+				}
+			}
+
 			function reset() {
 				buildTrack();
 
@@ -556,10 +578,13 @@
 					drawWall(walls[i]);
 				}
 
+				currentIndividual = undefined;
 				bestFitness = 0;
 				generation = 0;
 				genome = 0;
 				makeNewPopulation();
+				document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome;
+				document.querySelector('#net').innerHTML = 'speed: 0.00, fitness: 0.00, best fitness: 0.00';
 			}
 
 			reset();
