@@ -551,6 +551,11 @@
 				tickId = false;
 				lastTime = undefined;
 
+				ctx.clearRect(0, 0, width, height);
+				for(var i = 0; i < walls.length; i++) {
+					drawWall(walls[i]);
+				}
+
 				bestFitness = 0;
 				generation = 0;
 				genome = 0;
