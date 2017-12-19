@@ -292,19 +292,19 @@
 				var distances = [1, 1, 1];
 				var result = new p2.RaycastResult();
 				world.raycast(result, this.lSensor);
-				drawRayResult(result, this.lSensor);
+				drawSensor(result, this.lSensor);
 				if(result.hasHit()) {
 					distances[0] = result.getHitDistance(this.lSensor) / 75;
 				}
 				result.reset();
 				world.raycast(result, this.fSensor);
-				drawRayResult(result, this.fSensor);
+				drawSensor(result, this.fSensor);
 				if(result.hasHit()) {
 					distances[1] = result.getHitDistance(this.fSensor) / 75;
 				}
 				result.reset();
 				world.raycast(result, this.rSensor);
-				drawRayResult(result, this.rSensor);
+				drawSensor(result, this.rSensor);
 				if(result.hasHit()) {
 					distances[2] = result.getHitDistance(this.rSensor) / 75;
 				}
@@ -464,8 +464,8 @@
 				ctx.restore();
 			}
 
-			function drawRayResult(result, ray){
-				ctx.strokeStyle = 'red';
+			function drawSensor(result, ray) {
+				ctx.strokeStyle = '#ff5050';
 				ctx.beginPath();
 				ctx.moveTo(ray.from[0], ray.from[1]);
 				ctx.lineTo(ray.to[0], ray.to[1]);
@@ -521,15 +521,15 @@
 					drawWall(walls[i]);
 				}
 
-				ctx.strokeStyle = 'lightblue';
-				ctx.beginPath();
 				for(var i = 0; i < trails.length; i++) {
+					ctx.strokeStyle = i === trails.length - 1 ? 'lightblue' : '#444444';
+					ctx.beginPath();
 					ctx.moveTo(trails[i][0][0], trails[i][0][1]);
 					for(var j = 1; j < trails[i].length; j++) {
 						ctx.lineTo(trails[i][j][0], trails[i][j][1]);
 					}
+					ctx.stroke();
 				}
-				ctx.stroke();
 
 				if(currentIndividual) {
 					currentIndividual.update(dt);
