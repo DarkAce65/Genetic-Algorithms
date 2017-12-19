@@ -199,7 +199,7 @@
 				currentIndividual = this;
 			};
 
-			Individual.prototype.update = function(dt) {
+			Individual.prototype.update = function() {
 				this.car.update();
 				bestFitness = Math.max(bestFitness, this.fitness);
 
@@ -231,9 +231,10 @@
 				this.car.throttle = outputLayer[1];
 				this.car.brake = outputLayer[2];
 				this.prevFitness = this.fitness;
-				this.fitness += this.car.avgSpeed * dt / 1000;
+				var speed = this.car.speeds[this.car.speeds.length - 1];
+				this.fitness += speed / 1000;
 				trails[genome].push(p2.vec2.clone(this.car.chassis.body.position));
-				document.querySelector('#net').innerHTML = 'speed: ' + this.car.avgSpeed.toFixed(2) + ', fitness: ' + this.fitness.toFixed(2) + ', best fitness: ' + bestFitness.toFixed(2);
+				document.querySelector('#net').innerHTML = 'speed: ' + speed.toFixed(2) + ', fitness: ' + this.fitness.toFixed(2) + ', best fitness: ' + bestFitness.toFixed(2);
 			};
 
 			var Car = function(bodyWidth, bodyHeight) {
@@ -511,10 +512,8 @@
 				}
 			}
 
-			var lastTime;
 			function tick(time) {
-				var dt = lastTime ? time - lastTime : 0;
-				world.step(1 / 60, dt / 1000, 10);
+				world.step(1 / 60);
 				ctx.clearRect(0, 0, width, height);
 
 				for(var i = 0; i < walls.length; i++) {
@@ -532,7 +531,7 @@
 				}
 
 				if(currentIndividual) {
-					currentIndividual.update(dt);
+					currentIndividual.update();
 					currentIndividual.car.draw();
 
 					if(currentIndividual.finished) {
@@ -548,7 +547,6 @@
 					}
 				}
 
-				lastTime = time;
 				tickId = requestAnimFrame(tick);
 			}
 
@@ -571,7 +569,6 @@
 
 				cancelAnimFrame(tickId);
 				tickId = false;
-				lastTime = undefined;
 
 				ctx.clearRect(0, 0, width, height);
 				for(var i = 0; i < walls.length; i++) {
