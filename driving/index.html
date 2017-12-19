@@ -128,17 +128,17 @@
 			var startingPosition = [width / 2, height / 2];
 			var startingAngle = 0;
 
-			var Individual = function(p1, p2) {
+			var Individual = function(p0, p1) {
 				this.inputLayerWeights = [];
 				this.hiddenLayerWeights = [];
 
-				if(p1 && p2) {
+				if(p0 && p1) {
 					for(var i = 0; i < numInputNodes * numHiddenNodes; i++) {
 						if(Math.random() < 0.5) {
-							this.inputLayerWeights.push(p1.inputLayerWeights[i]);
+							this.inputLayerWeights.push(p0.inputLayerWeights[i]);
 						}
 						else {
-							this.inputLayerWeights.push(p2.inputLayerWeights[i]);
+							this.inputLayerWeights.push(p1.inputLayerWeights[i]);
 						}
 
 						if(Math.random() < mutationChance) {
@@ -150,10 +150,10 @@
 					}
 					for(var i = 0; i < numHiddenNodes * numOutputNodes; i++) {
 						if(Math.random() < 0.5) {
-							this.hiddenLayerWeights.push(p1.hiddenLayerWeights[i]);
+							this.hiddenLayerWeights.push(p0.hiddenLayerWeights[i]);
 						}
 						else {
-							this.hiddenLayerWeights.push(p2.hiddenLayerWeights[i]);
+							this.hiddenLayerWeights.push(p1.hiddenLayerWeights[i]);
 						}
 
 						if(Math.random() < mutationChance) {
