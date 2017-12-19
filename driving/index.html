@@ -423,9 +423,10 @@
 				return wall;
 			}
 
-			function buildTrack(points) {
+			function buildTrack(trackPoints) {
 				walls = [];
-				if(points && points.length > 1) {
+				if(trackPoints && trackPoints.length > 1) {
+					var points = trackPoints.slice(0);
 					var pathWidth = 80;
 
 					points.push(points[0]);
