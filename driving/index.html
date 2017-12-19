@@ -125,6 +125,7 @@
 			var world = new p2.World({gravity: [0, 0]});
 			var wallColGroup = 2;
 			var walls = [];
+			var track = [[130, 110], [150, 320], [90, 420], [110, 520], [400, 540], [650, 500], [700, 420], [680, 360], [560, 360], [400, 400], [320, 360], [340, 280], [450, 200], [660, 245], [685, 120], [600, 65], [305, 75]];
 			var startingPosition = [width / 2, height / 2];
 			var startingAngle = 0;
 
@@ -301,19 +302,19 @@
 				world.raycast(result, this.lSensor);
 				drawSensor(result, this.lSensor);
 				if(result.hasHit()) {
-					distances[0] = result.getHitDistance(this.lSensor) / 75;
+					distances[0] = result.getHitDistance(this.lSensor) / 100;
 				}
 				result.reset();
 				world.raycast(result, this.fSensor);
 				drawSensor(result, this.fSensor);
 				if(result.hasHit()) {
-					distances[1] = result.getHitDistance(this.fSensor) / 75;
+					distances[1] = result.getHitDistance(this.fSensor) / 100;
 				}
 				result.reset();
 				world.raycast(result, this.rSensor);
 				drawSensor(result, this.rSensor);
 				if(result.hasHit()) {
-					distances[2] = result.getHitDistance(this.rSensor) / 75;
+					distances[2] = result.getHitDistance(this.rSensor) / 100;
 				}
 
 				return distances;
@@ -350,9 +351,9 @@
 				sensorPositions.push([-w / 2, h / 2]);
 				sensorPositions.push([     0, h / 2]);
 				sensorPositions.push([ w / 2, h / 2]);
-				sensorPositions.push([-w / 2 - 45, h / 2 + 60]);
-				sensorPositions.push([     0     , h / 2 + 75]);
-				sensorPositions.push([ w / 2 + 45, h / 2 + 60]);
+				sensorPositions.push([-w / 2 - 60, h / 2 + 80]);
+				sensorPositions.push([     0     , h / 2 + 100]);
+				sensorPositions.push([ w / 2 + 60, h / 2 + 80]);
 				for(var i = 0; i < sensorPositions.length; i++) {
 					p2.vec2.rotate(sensorPositions[i], sensorPositions[i], this.chassis.body.angle);
 					p2.vec2.add(sensorPositions[i], sensorPositions[i], this.chassis.body.position);
@@ -595,7 +596,7 @@
 				}
 
 				for(var i = 0; i < trails.length; i++) {
-					ctx.strokeStyle = i === trails.length - 1 ? 'lightblue' : '#444444';
+					ctx.strokeStyle = i === trails.length - 1 ? 'lightblue' : 'rgba(255, 255, 255, 0.15)';
 					ctx.beginPath();
 					ctx.moveTo(trails[i][0][0], trails[i][0][1]);
 					for(var j = 1; j < trails[i].length; j++) {
@@ -639,7 +640,6 @@
 			}
 
 			function reset() {
-				var track = [[160, 230], [85, 330], [335, 520], [660, 440], [710, 380], [680, 330], [510, 350], [370, 330], [390, 240], [590, 200], [690, 155], [670, 80], [510, 60], [150, 100]];
 				buildTrack(track);
 
 				cancelAnimFrame(tickId);
