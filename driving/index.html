@@ -125,6 +125,8 @@
 			var world = new p2.World({gravity: [0, 0]});
 			var wallColGroup = 2;
 			var walls = [];
+			var startingPosition = [width / 2, height / 2];
+			var startingAngle = 0;
 
 			var Individual = function(p1, p2) {
 				this.inputLayerWeights = [];
@@ -238,7 +240,11 @@
 			};
 
 			var Car = function(bodyWidth, bodyHeight) {
-				var chassisBody = new p2.Body({position: [400, 300], mass: 1});
+				var chassisBody = new p2.Body({
+					mass: 1,
+					position: p2.vec2.clone(startingPosition),
+					angle: startingAngle
+				});
 				var boxShape = new p2.Box({
 					width: bodyWidth,
 					height: bodyHeight,
@@ -402,45 +408,113 @@
 		        ctx.restore();
 			};
 
-			function buildTrack() {
+			function buildWall(pt0, pt1) {
+				var wall = new p2.Body({
+					position: [(pt0[0] + pt1[0]) / 2, (pt0[1] + pt1[1]) / 2],
+					angle: Math.atan2(pt1[1] - pt0[1], pt1[0] - pt0[0])
+				});
+				wall.addShape(new p2.Box({
+					width: p2.vec2.dist(pt0, pt1),
+					height: 5,
+					collisionGroup: wallColGroup
+				}));
+
+				return wall;
+			}
+
+			function buildTrack(points) {
 				walls = [];
-				for(var i = 0; i < 20; i++) {
-					var wall = new p2.Body({
-						position: [width * Math.random(), height * Math.random()],
-						angle: 2 * Math.PI * Math.random()
-					});
-					wall.addShape(new p2.Box({
-						width: 80 * Math.random() + 30,
-						height: 80 * Math.random() + 30,
-						collisionGroup: wallColGroup
-					}));
-					walls[i] = wall;
+				if(points && points.length > 1) {
+					var pathWidth = 80;
+
+					points.push(points[0]);
+					points.push(points[1]);
+
+					var innerPoints = [];
+					var outerPoints = [];
+
+					var x = points[0][0];
+					var y = points[0][1];
+					var x1 = points[1][0];
+					var y1 = points[1][1];
+					var prevAngle = Math.atan2(y1 - y, x1 - x);
+					startingPosition = points[0];
+					startingAngle = prevAngle - Math.PI / 2;
+
+					for(var i = 0; i < points.length - 1; i++) {
+						var x = points[i][0];
+						var y = points[i][1];
+						var x1 = points[i + 1][0];
+						var y1 = points[i + 1][1];
+
+						var angle = Math.atan2(y1 - y, x1 - x);
+						var pathAngle = Math.PI + angle - prevAngle;
+
+						var shift = [Math.cos(pathAngle / 2 + prevAngle), Math.sin(pathAngle / 2 + prevAngle)];
+						p2.vec2.scale(shift, shift, (pathWidth + 5) / 2 / Math.sin(pathAngle / 2));
+
+						var inPt = p2.vec2.add([0, 0], points[i], shift);
+						var outPt = p2.vec2.sub([0, 0], points[i], shift);
+
+						innerPoints.push(inPt);
+						outerPoints.push(outPt);
+
+						if(i === points.length - 2) {
+							innerPoints[0] = inPt;
+							outerPoints[0] = outPt;
+						}
+
+						prevAngle = angle;
+					}
+
+					for(var i = 0; i < innerPoints.length - 1; i++) {
+						walls.push(buildWall(innerPoints[i], innerPoints[i + 1]));
+					}
+					for(var i = 0; i < outerPoints.length - 1; i++) {
+						walls.push(buildWall(outerPoints[i], outerPoints[i + 1]));
+					}
+				}
+				else {
+					startingPosition = [width / 2, height / 2];
+					startingAngle = 0;
+					for(var i = 0; i < 20; i++) {
+						var wall = new p2.Body({
+							position: [width * Math.random(), height * Math.random()],
+							angle: 2 * Math.PI * Math.random()
+						});
+						wall.addShape(new p2.Box({
+							width: 80 * Math.random() + 30,
+							height: 80 * Math.random() + 30,
+							collisionGroup: wallColGroup
+						}));
+						walls[i] = wall;
+					}
 				}
 
 				var top = new p2.Body({position: [width / 2, 0]});
 				top.addShape(new p2.Box({
 					width: width,
-					height: 20,
+					height: 10,
 					collisionGroup: wallColGroup
 				}));
 				walls.push(top);
 				var bottom = new p2.Body({position: [width / 2, height]});
 				bottom.addShape(new p2.Box({
 					width: width,
-					height: 20,
+					height: 10,
 					collisionGroup: wallColGroup
 				}));
 				walls.push(bottom);
 				var left = new p2.Body({position: [0, height / 2]});
 				left.addShape(new p2.Box({
-					width: 20,
+					width: 10,
 					height: height,
 					collisionGroup: wallColGroup
 				}));
 				walls.push(left);
 				var right = new p2.Body({position: [width, height / 2]});
 				right.addShape(new p2.Box({
-					width: 20,
+					width: 10,
 					height: height,
 					collisionGroup: wallColGroup
 				}));
@@ -565,12 +639,14 @@
 			}
 
 			function reset() {
-				buildTrack();
+				var track = [[160, 230], [85, 330], [335, 520], [660, 440], [710, 380], [680, 330], [510, 350], [370, 330], [390, 240], [590, 200], [690, 155], [670, 80], [510, 60], [150, 100]];
+				buildTrack(track);
 
 				cancelAnimFrame(tickId);
 				tickId = false;
 
 				ctx.clearRect(0, 0, width, height);
+
 				for(var i = 0; i < walls.length; i++) {
 					drawWall(walls[i]);
 				}
