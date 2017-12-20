@@ -546,6 +546,19 @@
 				ctx.stroke();
 			}
 
+			function drawCross(pt) {
+				ctx.strokeStyle = '#ff5050';
+				ctx.beginPath();
+				ctx.save();
+				ctx.translate(pt[0], pt[1]);
+				ctx.moveTo(-4, -4);
+				ctx.lineTo(4, 4);
+				ctx.moveTo(-4, 4);
+				ctx.lineTo(4, -4);
+				ctx.stroke();
+				ctx.restore();
+			}
+
 			function makeNewPopulation() {
 				trails = [];
 				genome = 0;
@@ -587,6 +600,9 @@
 						ctx.lineTo(trails[i][j][0], trails[i][j][1]);
 					}
 					ctx.stroke();
+					if(i !== genome) {
+						drawCross(trails[i][trails[i].length - 1]);
+					}
 				}
 
 				if(currentIndividual) {
