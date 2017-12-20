@@ -125,7 +125,7 @@
 			var world = new p2.World({gravity: [0, 0]});
 			var wallColGroup = 2;
 			var walls = [];
-			var track = [[130, 110], [150, 320], [90, 420], [110, 520], [400, 540], [650, 500], [700, 420], [680, 360], [560, 360], [400, 400], [320, 360], [340, 280], [450, 200], [660, 245], [685, 120], [600, 65], [305, 75]];
+			var track = [[130, 110], [150, 320], [90, 420], [110, 520], [400, 540], [650, 500], [700, 420], [660, 360], [560, 360], [400, 400], [320, 360], [340, 280], [450, 200], [660, 245], [685, 120], [600, 65], [305, 75]];
 			var startingPosition = [width / 2, height / 2];
 			var startingAngle = 0;
 
@@ -174,7 +174,6 @@
 					}
 				}
 
-				this.prevFitness = 0;
 				this.fitness = 0;
 				this.finished = false;
 				this.car = new Car(20, 40);
@@ -190,7 +189,6 @@
 
 				addTrack();
 
-				this.prevFitness = 0;
 				this.fitness = 0;
 				this.finished = false;
 
@@ -233,7 +231,7 @@
 				this.car.steer = outputLayer[0];
 				this.car.throttle = outputLayer[1];
 				this.car.brake = outputLayer[2];
-				this.prevFitness = this.fitness;
+
 				var speed = this.car.speeds[this.car.speeds.length - 1];
 				this.fitness += speed / 1000;
 				trails[genome].push(p2.vec2.clone(this.car.chassis.body.position));
@@ -351,9 +349,10 @@
 				sensorPositions.push([-w / 2, h / 2]);
 				sensorPositions.push([     0, h / 2]);
 				sensorPositions.push([ w / 2, h / 2]);
-				sensorPositions.push([-w / 2 - 60, h / 2 + 80]);
-				sensorPositions.push([     0     , h / 2 + 100]);
-				sensorPositions.push([ w / 2 + 60, h / 2 + 80]);
+				var d = 100 / Math.sqrt(2);
+				sensorPositions.push([-w / 2 - d, h / 2 + d]);
+				sensorPositions.push([     0    , h / 2 + 100]);
+				sensorPositions.push([ w / 2 + d, h / 2 + d]);
 				for(var i = 0; i < sensorPositions.length; i++) {
 					p2.vec2.rotate(sensorPositions[i], sensorPositions[i], this.chassis.body.angle);
 					p2.vec2.add(sensorPositions[i], sensorPositions[i], this.chassis.body.position);
