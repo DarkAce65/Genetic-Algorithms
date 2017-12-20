@@ -424,7 +424,7 @@
 
 			function buildTrack(trackPoints) {
 				walls = [];
-				if(trackPoints && trackPoints.length > 1) {
+				if(trackPoints.length > 1) {
 					var points = trackPoints.slice(0);
 					var pathWidth = 80;
 
@@ -473,22 +473,6 @@
 					}
 					for(var i = 0; i < outerPoints.length - 1; i++) {
 						walls.push(buildWall(outerPoints[i], outerPoints[i + 1]));
-					}
-				}
-				else {
-					startingPosition = [width / 2, height / 2];
-					startingAngle = 0;
-					for(var i = 0; i < 20; i++) {
-						var wall = new p2.Body({
-							position: [width * Math.random(), height * Math.random()],
-							angle: 2 * Math.PI * Math.random()
-						});
-						wall.addShape(new p2.Box({
-							width: 80 * Math.random() + 30,
-							height: 80 * Math.random() + 30,
-							collisionGroup: wallColGroup
-						}));
-						walls[i] = wall;
 					}
 				}
 
