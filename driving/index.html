@@ -123,8 +123,32 @@
 		    ctx.translate(0, -height);
 
 			var world = new p2.World({gravity: [0, 0]});
-			var wallColGroup = 2;
+			world.on('beginContact', function(event) {
+				function updateCheckpoint(body) {
+					var number = Math.max(body.number, currentIndividual.checkpoint.number);
+					if(body.number === 0 && number === checkpoints.length - 1) {
+						number = 0;
+					}
+					currentIndividual.prevFitness += currentIndividual.checkpoint.progress * currentIndividual.checkpoint.distToNext;
+					currentIndividual.checkpoint.progress = 0;
+					currentIndividual.checkpoint.number = number;
+					currentIndividual.checkpoint.distToNext = currentIndividual.distToCheckpoint(number + 1);
+				}
+
+				if(event.shapeA.collisionGroup === checkpointGroup) {
+					updateCheckpoint(event.bodyA);
+				}
+				else if(event.shapeB.collisionGroup === checkpointGroup) {
+					updateCheckpoint(event.bodyB);
+				}
+				else {
+					currentIndividual.finished = true;
+				}
+			});
+			var wallGroup = 0b10;
+			var checkpointGroup = 0b100;
 			var walls = [];
+			var checkpoints = [];
 			var track = [[130, 110], [150, 320], [90, 420], [110, 520], [400, 540], [650, 500], [700, 420], [660, 360], [560, 360], [400, 400], [320, 360], [340, 280], [450, 200], [660, 245], [685, 120], [600, 65], [305, 75]];
 			var startingPosition = [width / 2, height / 2];
 			var startingAngle = 0;
@@ -174,35 +198,41 @@
 					}
 				}
 
-				this.fitness = 0;
-				this.finished = false;
 				this.car = new Car(20, 40);
+				this.checkpoint = {
+					number: -1,
+					distToNext: this.distToCheckpoint(0),
+					progress: 0
+				};
+				this.prevFitness = 0;
+				this.finished = false;
 			};
 
 			Individual.prototype.setSimulation = function() {
 				world.clear();
 				world.gravity = [0, 0];
 
-				world.on('beginContact', function(event) {
-					currentIndividual.finished = true;
-				});
-
 				addTrack();
-
-				this.fitness = 0;
-				this.finished = false;
 
 				this.car = new Car(20, 40);
 				trails.push([p2.vec2.clone(this.car.chassis.body.position)]);
 				world.addBody(this.car.chassis.body);
 				this.car.tdv.addToWorld(world);
 
+				this.checkpoint = {
+					number: -1,
+					distToNext: this.distToCheckpoint(0),
+					progress: 0
+				};
+				this.prevFitness = 0;
+				this.finished = false;
+
 				currentIndividual = this;
 			};
 
 			Individual.prototype.update = function() {
 				this.car.update();
-				bestFitness = Math.max(bestFitness, this.fitness);
+				bestFitness = Math.max(bestFitness, this.fitness());
 
 				if(this.car.speeds.length == speedAvgWindow && this.car.avgSpeed < 1) {
 					this.finished = true;
@@ -232,10 +262,25 @@
 				this.car.throttle = outputLayer[1];
 				this.car.brake = outputLayer[2];
 
-				var speed = this.car.speeds[this.car.speeds.length - 1];
-				this.fitness += speed / 1000;
+				if(this.checkpoint.distToNext === 0) {
+					this.checkpoint.progress = 0;
+				}
+				else {
+					this.checkpoint.progress = 1 - this.distToCheckpoint(this.checkpoint.number + 1) / this.checkpoint.distToNext;
+				}
+
 				trails[genome].push(p2.vec2.clone(this.car.chassis.body.position));
-				document.querySelector('#net').innerHTML = 'speed: ' + speed.toFixed(2) + ', fitness: ' + this.fitness.toFixed(2) + ', best fitness: ' + bestFitness.toFixed(2);
+				document.querySelector('#net').innerHTML = 'avg. speed (' + speedAvgWindow + '): ' + this.car.avgSpeed.toFixed(2) + ', fitness: ' + this.fitness().toFixed(2) + ', best fitness: ' + bestFitness.toFixed(2) + '<br>checkpoint: ' + this.checkpoint.number + ', progress: ' + this.checkpoint.progress.toFixed(3);
+			};
+
+			Individual.prototype.distToCheckpoint = function(number) {
+				var carBody = this.car.chassis.body;
+				var checkpoint = checkpoints[number % checkpoints.length];
+				return p2.vec2.dist(carBody.position, checkpoint.position);
+			};
+
+			Individual.prototype.fitness = function() {
+				return this.prevFitness + this.checkpoint.progress * this.checkpoint.distToNext;
 			};
 
 			var Car = function(bodyWidth, bodyHeight) {
@@ -247,7 +292,7 @@
 				var boxShape = new p2.Box({
 					width: bodyWidth,
 					height: bodyHeight,
-					collisionMask: wallColGroup
+					collisionMask: wallGroup | checkpointGroup
 				});
 				chassisBody.addShape(boxShape);
 
@@ -266,15 +311,15 @@
 
 				var lSensor = new p2.Ray({
 					mode: p2.Ray.CLOSEST,
-					collisionMask: wallColGroup
+					collisionMask: wallGroup
 				});
 				var fSensor = new p2.Ray({
 					mode: p2.Ray.CLOSEST,
-					collisionMask: wallColGroup
+					collisionMask: wallGroup
 				});
 				var rSensor = new p2.Ray({
 					mode: p2.Ray.CLOSEST,
-					collisionMask: wallColGroup
+					collisionMask: wallGroup
 				});
 
 				this.tdv = vehicle;
@@ -320,7 +365,7 @@
 
 			Car.prototype.update = function() {
 				this.speeds.push((this.wheels[2].getSpeed() + this.wheels[3].getSpeed()) / 2);
-				if(this.speeds.length > speedAvgWindow) {
+				while(this.speeds.length > speedAvgWindow) {
 					this.speeds.shift();
 				}
 
@@ -416,15 +461,32 @@
 				wall.addShape(new p2.Box({
 					width: p2.vec2.dist(pt0, pt1),
 					height: 5,
-					collisionGroup: wallColGroup
+					collisionGroup: wallGroup
 				}));
 
 				return wall;
 			}
 
+			function buildCheckpoint(pt0, pt1) {
+				var checkpoint = new p2.Body({
+					position: [(pt0[0] + pt1[0]) / 2, (pt0[1] + pt1[1]) / 2],
+					angle: Math.atan2(pt1[1] - pt0[1], pt1[0] - pt0[0])
+				});
+				checkpoint.addShape(new p2.Box({
+					width: p2.vec2.dist(pt0, pt1),
+					height: 0.5,
+					sensor: true,
+					collisionGroup: checkpointGroup
+				}));
+
+				return checkpoint;
+			}
+
 			function buildTrack(trackPoints) {
-				walls = [];
 				if(trackPoints.length > 1) {
+					walls = [];
+					checkpoints = [];
+
 					var points = trackPoints.slice(0);
 					var pathWidth = 80;
 
@@ -463,6 +525,14 @@
 						if(i === points.length - 2) {
 							innerPoints[0] = inPt;
 							outerPoints[0] = outPt;
+							var checkpoint = buildCheckpoint(inPt, outPt);
+							checkpoint.number = 0;
+							checkpoints[0] = checkpoint;
+						}
+						else {
+							var checkpoint = buildCheckpoint(inPt, outPt);
+							checkpoint.number = checkpoints.length;
+							checkpoints.push(checkpoint);
 						}
 
 						prevAngle = angle;
@@ -480,28 +550,28 @@
 				top.addShape(new p2.Box({
 					width: width,
 					height: 10,
-					collisionGroup: wallColGroup
+					collisionGroup: wallGroup
 				}));
 				walls.push(top);
 				var bottom = new p2.Body({position: [width / 2, height]});
 				bottom.addShape(new p2.Box({
 					width: width,
 					height: 10,
-					collisionGroup: wallColGroup
+					collisionGroup: wallGroup
 				}));
 				walls.push(bottom);
 				var left = new p2.Body({position: [0, height / 2]});
 				left.addShape(new p2.Box({
 					width: 10,
 					height: height,
-					collisionGroup: wallColGroup
+					collisionGroup: wallGroup
 				}));
 				walls.push(left);
 				var right = new p2.Body({position: [width, height / 2]});
 				right.addShape(new p2.Box({
 					width: 10,
 					height: height,
-					collisionGroup: wallColGroup
+					collisionGroup: wallGroup
 				}));
 				walls.push(right);
 			}
@@ -509,6 +579,9 @@
 			function addTrack() {
 				for(var i = 0; i < walls.length; i++) {
 					world.addBody(walls[i]);
+				}
+				for(var i = 0; i < checkpoints.length; i++) {
+					world.addBody(checkpoints[i]);
 				}
 			}
 
@@ -546,6 +619,16 @@
 				ctx.stroke();
 			}
 
+			function drawCheckpoint(checkpoint) {
+				ctx.beginPath();
+				ctx.save();
+				ctx.translate(checkpoint.position[0], checkpoint.position[1]);
+				ctx.rotate(checkpoint.angle);
+				ctx.rect(-checkpoint.shapes[0].width / 2, -checkpoint.shapes[0].height / 2, checkpoint.shapes[0].width, checkpoint.shapes[0].height);
+				ctx.stroke();
+				ctx.restore();
+			}
+
 			function drawCross(pt) {
 				ctx.strokeStyle = '#ff5050';
 				ctx.beginPath();
@@ -571,7 +654,7 @@
 				else {
 					var datalen = data.length;
 					data = data.sort(function(a, b) {
-						return b.fitness - a.fitness;
+						return b.fitness() - a.fitness();
 					});
 
 					var breeders = data.slice(0, Math.max(2, ~~(datalen * 0.15)));
@@ -590,6 +673,13 @@
 
 				for(var i = 0; i < walls.length; i++) {
 					drawWall(walls[i]);
+				}
+				for(var i = 0; i < checkpoints.length; i++) {
+					ctx.strokeStyle = 'rgba(255, 80, 80, 0.3)';
+					if(currentIndividual && currentIndividual.checkpoint.number >= i) {
+						ctx.strokeStyle = '#ff5050';
+					}
+					drawCheckpoint(checkpoints[i]);
 				}
 
 				for(var i = 0; i < trails.length; i++) {
@@ -649,6 +739,10 @@
 
 				for(var i = 0; i < walls.length; i++) {
 					drawWall(walls[i]);
+				}
+				ctx.strokeStyle = 'rgba(255, 80, 80, 0.3)';
+				for(var i = 0; i < checkpoints.length; i++) {
+					drawCheckpoint(checkpoints[i]);
 				}
 
 				currentIndividual = undefined;
