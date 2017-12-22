@@ -6,6 +6,7 @@
 		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<script type="text/javascript" src="node_modules/p2/build/p2.js"></script>
+		<script type="text/javascript" src="node_modules/chroma-js/chroma.js"></script>
 		<style type="text/css">
 			html, body {
 				margin: 0;
@@ -46,22 +47,55 @@
 				border-bottom-right-radius: 4px;
 			}
 
-			#canvas {
-				border: 1px solid white;
+			.container {
+				margin: 10px;
 			}
 
-			#genetic, #net {
+			canvas {
+				border: 1px solid #222222;
+			}
+
+			#canvas {
+				border-color: white;
+			}
+
+			#stats {
+				margin: 10px auto;
+			}
+
+			#stats::after {
+				content: '';
+				display: block;
+				clear: both;
+			}
+
+			#net {
+				float: left;
+			}
+
+			#genetic, #individual {
 				font-family: monospace;
+			}
+
+			#fitness {
+				float: right;
 			}
 		</style>
 	</head>
 	<body>
-		<div style="margin: 20px;">
+		<div class="container">
+			<div id="stats">
+				<canvas id="net"></canvas>
+				<div style="display: inline-block;">
+					<div id="genetic">Generation: 0, Genome: 0<br>Best Fitness: 0.00</div>
+					<div id="individual">Fitness: 0.00, Avg. Speed: 0.00</div>
+					<br>
+					<div><button onclick="start();">Start</button><button onclick="kill();">Kill Current Simulation</button><button onclick="reset();">Reset</button></div>
+				</div>
+				<canvas id="fitness"></canvas>
+			</div>
 			<canvas id="canvas"></canvas>
-			<div id="net">speed: 0.00, fitness: 0.00, best fitness: 0.00</div>
-			<div id="genetic">Generation: 0, Genome: 0</div>
 		</div>
-		<div><button onclick="start();">Start</button><button onclick="kill();">Kill Current Simulation</button><button onclick="reset();">Reset</button></div>
 		<script type="text/javascript">
 			'use strict';
 
@@ -90,14 +124,6 @@
 				return array;
 			}
 
-			var inputs = {
-				'32': 0,
-				'37': 0,
-				'38': 0,
-				'39': 0,
-				'40': 0
-			};
-
 			var tickId = false;
 			var numInputNodes = 3;
 			var numHiddenNodes = 5;
@@ -108,6 +134,7 @@
 
 			var data = [];
 			var trails = [];
+			var fitnessData = [];
 			var generation = 0;
 			var genome = 0;
 			var currentIndividual;
@@ -115,12 +142,29 @@
 
 			var width = 800;
 			var height = 600;
+			document.getElementById('stats').style.width = width + 'px';
 			var canvas = document.getElementById('canvas');
 			canvas.width = width;
 			canvas.height = height;
 			var ctx = canvas.getContext('2d');
 		    ctx.scale(1, -1);
 		    ctx.translate(0, -height);
+
+			var statWidth = 200;
+			var statHeight = 125;
+			var netCanvas = document.getElementById('net');
+			netCanvas.width = statWidth;
+			netCanvas.height = statHeight;
+			var netCtx = netCanvas.getContext('2d');
+			var netNodeColor = chroma.scale(['aquamarine', '#222222', 'white']).domain([-1, 1]);
+			var netWeightColor = chroma.scale(['aquamarine', '#222222', 'white']).domain([-1, 1]);
+
+			var fitnessCanvas = document.getElementById('fitness');
+			fitnessCanvas.width = statWidth;
+			fitnessCanvas.height = statHeight;
+			var fitnessCtx = fitnessCanvas.getContext('2d');
+		    fitnessCtx.scale(1, -1);
+		    fitnessCtx.translate(0, -statHeight);
 
 			var world = new p2.World({gravity: [0, 0]});
 			world.on('beginContact', function(event) {
@@ -142,6 +186,7 @@
 					updateCheckpoint(event.bodyB);
 				}
 				else {
+					bestFitness = Math.max(bestFitness, currentIndividual.fitness());
 					currentIndividual.finished = true;
 				}
 			});
@@ -224,6 +269,9 @@
 				world.addBody(this.car.chassis.body);
 				this.car.tdv.addToWorld(world);
 
+				drawNetWeights(this);
+				drawNetNodes(Array(numInputNodes).fill(0), Array(numHiddenNodes).fill(0), Array(numOutputNodes).fill(0));
+				fitnessData = [];
 				this.checkpoint = {
 					number: -1,
 					distToNext: this.distToCheckpoint(0),
@@ -237,9 +285,13 @@
 
 			Individual.prototype.update = function() {
 				this.car.update();
-				bestFitness = Math.max(bestFitness, this.fitness());
+				fitnessData.push({
+					fitness: this.fitness(),
+					speed: this.car.avgSpeed
+				});
 
 				if(this.car.speeds.length == speedAvgWindow && this.car.avgSpeed < 1) {
+					bestFitness = Math.max(bestFitness, this.fitness());
 					this.finished = true;
 				}
 
@@ -260,9 +312,10 @@
 				}
 
 				for(var i = 0; i < numOutputNodes; i++) {
-					outputLayer[i] = Math.min(Math.max(0, outputLayer[i]), 1);
+					outputLayer[i] = Math.min(Math.max(0, Math.abs(outputLayer[i])), 1);
 				}
 
+				drawNetNodes(inputLayer, hiddenLayer, outputLayer);
 				this.car.steer = outputLayer[0];
 				this.car.throttle = outputLayer[1];
 				this.car.brake = outputLayer[2];
@@ -275,7 +328,8 @@
 				}
 
 				trails[genome].push(p2.vec2.clone(this.car.chassis.body.position));
-				document.querySelector('#net').innerHTML = 'avg. speed (' + speedAvgWindow + '): ' + this.car.avgSpeed.toFixed(2) + ', fitness: ' + this.fitness().toFixed(2) + ', best fitness: ' + bestFitness.toFixed(2) + '<br>checkpoint: ' + this.checkpoint.number + ', progress: ' + this.checkpoint.progress.toFixed(3);
+				document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
+				document.querySelector('#individual').innerHTML = 'Fitness: ' + this.fitness().toFixed(2) + ', Avg. Speed: ' + this.car.avgSpeed.toFixed(2);
 			};
 
 			Individual.prototype.distToCheckpoint = function(number) {
@@ -647,6 +701,103 @@
 				ctx.restore();
 			}
 
+			function drawFitness(individual) {
+				fitnessCtx.clearRect(0, 0, statWidth, statHeight);
+
+				fitnessCtx.fillStyle = 'white';
+				fitnessCtx.fillRect(Math.min(statWidth / 2, individual.car.steer * statWidth), 0, Math.abs(individual.car.steer - 0.5) * statWidth, statHeight / 10);
+				fitnessCtx.fillRect(statWidth / 9, statHeight / 10, statWidth / 3, individual.car.throttle * statHeight * 9 / 10);
+				fitnessCtx.fillStyle = '#ff5050';
+				fitnessCtx.fillRect(statWidth * 5 / 9, statHeight / 10, statWidth / 3, individual.car.brake * statHeight * 9 / 10);
+
+				fitnessCtx.strokeStyle = 'aqua';
+				fitnessCtx.beginPath();
+				var max = 0;
+				for(var i = 0; i < fitnessData.length; i++) {
+					max = Math.max(max, fitnessData[i].speed);
+				}
+				fitnessCtx.moveTo(0, fitnessData[0].speed / max * statHeight);
+				for(var i = 1; i < fitnessData.length; i++) {
+					fitnessCtx.lineTo(i / fitnessData.length * statWidth, fitnessData[i].speed / max * statHeight);
+				}
+				fitnessCtx.stroke();
+
+				fitnessCtx.strokeStyle = 'aquamarine';
+				fitnessCtx.beginPath();
+				max = bestFitness;
+				for(var i = 0; i < fitnessData.length; i++) {
+					max = Math.max(max, fitnessData[i].fitness);
+				}
+				max *= 1.1;
+				fitnessCtx.moveTo(0, fitnessData[0].fitness / max * statHeight);
+				for(var i = 1; i < fitnessData.length; i++) {
+					fitnessCtx.lineTo(i / fitnessData.length * statWidth, fitnessData[i].fitness / max * statHeight);
+				}
+				fitnessCtx.stroke();
+
+				fitnessCtx.strokeStyle = '#ff5050';
+				fitnessCtx.beginPath();
+				fitnessCtx.moveTo(0, bestFitness / max * statHeight);
+				fitnessCtx.lineTo(statWidth, bestFitness / max * statHeight);
+				fitnessCtx.stroke();
+			}
+
+			function drawNetWeights(individual) {
+				netCtx.clearRect(0, 0, statWidth, statHeight);
+
+				for(var i = 0; i < numInputNodes; i++) {
+					var p = (i + 0.5) / numInputNodes;
+					for(var j = 0; j < numHiddenNodes; j++) {
+						var pn = (j + 0.5) / numHiddenNodes;
+						var w = individual.inputLayerWeights[i * numHiddenNodes + j];
+						netCtx.strokeStyle = netWeightColor(w);
+						netCtx.beginPath();
+						netCtx.moveTo(30, p * statHeight);
+						netCtx.lineTo(statWidth / 2, pn * statHeight);
+						netCtx.stroke();
+					}
+				}
+				for(var i = 0; i < numHiddenNodes; i++) {
+					var p = (i + 0.5) / numHiddenNodes;
+					for(var j = 0; j < numOutputNodes; j++) {
+						var pn = (j + 0.5) / numOutputNodes;
+						var w = individual.hiddenLayerWeights[i * numOutputNodes + j];
+						netCtx.strokeStyle = netWeightColor(w);
+						netCtx.beginPath();
+						netCtx.moveTo(statWidth / 2, p * statHeight);
+						netCtx.lineTo(statWidth - 30, pn * statHeight);
+						netCtx.stroke();
+					}
+				}
+			}
+
+			function drawNetNodes(input, hidden, output) {
+				for(var i = 0; i < input.length; i++) {
+					var p = (i + 0.5) / input.length;
+					var w = input[i];
+					netCtx.fillStyle = netNodeColor(w);
+					netCtx.beginPath();
+					netCtx.arc(30, p * statHeight, 5, 0, 2 * Math.PI);
+					netCtx.fill();
+				}
+				for(var i = 0; i < hidden.length; i++) {
+					var p = (i + 0.5) / hidden.length;
+					var w = hidden[i];
+					netCtx.fillStyle = netNodeColor(w);
+					netCtx.beginPath();
+					netCtx.arc(statWidth / 2, p * statHeight, 5, 0, 2 * Math.PI);
+					netCtx.fill();
+				}
+				for(var i = 0; i < output.length; i++) {
+					var p = (i + 0.5) / output.length;
+					var w = output[i];
+					netCtx.fillStyle = netNodeColor(w);
+					netCtx.beginPath();
+					netCtx.arc(statWidth - 30, p * statHeight, 5, 0, 2 * Math.PI);
+					netCtx.fill();
+				}
+			}
+
 			function makeNewPopulation() {
 				trails = [];
 				genome = 0;
@@ -689,7 +840,7 @@
 				}
 
 				for(var i = 0; i < trails.length; i++) {
-					ctx.strokeStyle = i === trails.length - 1 ? 'lightblue' : 'rgba(255, 255, 255, 0.15)';
+					ctx.strokeStyle = i === trails.length - 1 ? 'aquamarine' : 'rgba(255, 255, 255, 0.15)';
 					ctx.beginPath();
 					ctx.moveTo(trails[i][0][0], trails[i][0][1]);
 					for(var j = 1; j < trails[i].length; j++) {
@@ -704,6 +855,7 @@
 				if(currentIndividual) {
 					currentIndividual.update();
 					currentIndividual.car.draw();
+					drawFitness(currentIndividual);
 
 					if(currentIndividual.finished) {
 						genome++;
@@ -714,7 +866,7 @@
 
 						currentIndividual = data[genome];
 						currentIndividual.setSimulation();
-						document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome;
+						document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
 					}
 				}
 
@@ -724,13 +876,14 @@
 			function start() {
 				if(!tickId) {
 					data[0].setSimulation();
-					document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome;
+					document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
 					tick();
 				}
 			}
 
 			function kill() {
 				if(currentIndividual) {
+					bestFitness = Math.max(bestFitness, currentIndividual.fitness());
 					currentIndividual.finished = true;
 				}
 			}
@@ -742,6 +895,8 @@
 				tickId = false;
 
 				ctx.clearRect(0, 0, width, height);
+				netCtx.clearRect(0, 0, statWidth, statHeight);
+				fitnessCtx.clearRect(0, 0, statWidth, statHeight);
 
 				for(var i = 0; i < walls.length; i++) {
 					drawWall(walls[i]);
@@ -756,8 +911,8 @@
 				generation = 0;
 				genome = 0;
 				makeNewPopulation();
-				document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome;
-				document.querySelector('#net').innerHTML = 'speed: 0.00, fitness: 0.00, best fitness: 0.00';
+				document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
+				document.querySelector('#individual').innerHTML = 'Fitness: 0.00, Avg. Speed: 0.00';
 			}
 
 			reset();
