@@ -124,6 +124,10 @@
                 return array;
             }
 
+            function squaredSum(acc, value) {
+                return acc + value * value;
+            }
+
             var tickId = false;
             var numInputNodes = 3;
             var numHiddenNodes = 5;
@@ -242,6 +246,7 @@
                         this.hiddenLayerWeights.push(Math.random() * 2 - 1);
                     }
                 }
+                this.weightsSquared = (this.inputLayerWeights.reduce(squaredSum) + this.hiddenLayerWeights.reduce(squaredSum)) / numHiddenNodes / (numInputNodes + numOutputNodes);
 
                 this.car = new Car(20, 40);
                 this.checkpoint = {
@@ -338,7 +343,7 @@
             };
 
             Individual.prototype.fitness = function() {
-                return this.prevFitness + this.checkpoint.progress * this.checkpoint.distToNext;
+                return this.prevFitness + this.checkpoint.progress * this.checkpoint.distToNext / this.weightsSquared;
             };
 
             var Car = function(bodyWidth, bodyHeight) {
