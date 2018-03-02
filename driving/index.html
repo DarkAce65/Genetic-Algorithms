@@ -1,921 +1,921 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<title>Driving Simulation</title>
-		<meta charset="utf-8">
-		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<script type="text/javascript" src="node_modules/p2/build/p2.js"></script>
-		<script type="text/javascript" src="node_modules/chroma-js/chroma.js"></script>
-		<style type="text/css">
-			html, body {
-				margin: 0;
-				padding: 0;
-			}
-
-			body {
-				height: 100%;
-				color: white;
-				background-color: #121212;
-				text-align: center;
-			}
-
-			button {
-				background-color: #121212;
-				color: whitesmoke;
-				border: 2px solid whitesmoke;
-				border-radius: 0;
-				padding: 7px 14px;
-				margin-left: -2px;
-				font-weight: bold;
-				cursor: pointer;
-			}
-
-			button:hover, button:focus {
-				outline: none;
-				background-color: #333333;
-			}
-
-			button:first-child {
-				margin-left: 0;
-				border-top-left-radius: 4px;
-				border-bottom-left-radius: 4px;
-			}
-
-			button:last-child {
-				border-top-right-radius: 4px;
-				border-bottom-right-radius: 4px;
-			}
-
-			.container {
-				margin: 10px;
-			}
-
-			canvas {
-				border: 1px solid #222222;
-			}
-
-			#canvas {
-				border-color: white;
-			}
-
-			#stats {
-				margin: 10px auto;
-			}
-
-			#stats::after {
-				content: '';
-				display: block;
-				clear: both;
-			}
-
-			#net {
-				float: left;
-			}
-
-			#genetic, #individual {
-				font-family: monospace;
-			}
-
-			#fitness {
-				float: right;
-			}
-		</style>
-	</head>
-	<body>
-		<div class="container">
-			<div id="stats">
-				<canvas id="net"></canvas>
-				<div style="display: inline-block;">
-					<div id="genetic">Generation: 0, Genome: 0<br>Best Fitness: 0.00</div>
-					<div id="individual">Fitness: 0.00, Avg. Speed: 0.00</div>
-					<br>
-					<div><button onclick="start();">Start</button><button onclick="kill();">Kill Current Simulation</button><button onclick="reset();">Reset</button></div>
-				</div>
-				<canvas id="fitness"></canvas>
-			</div>
-			<canvas id="canvas"></canvas>
-		</div>
-		<script type="text/javascript">
-			'use strict';
-
-			window.requestAnimFrame =
-				window.requestAnimationFrame ||
-				window.webkitRequestAnimationFrame ||
-				window.mozRequestAnimationFrame ||
-				window.oRequestAnimationFrame ||
-				window.msRequestAnimationFrame ||
-				function(callback) {
-					window.setTimeout(callback, 1000 / 60);
-				};
-
-			window.cancelAnimFrame =
-				window.cancelAnimationFrame ||
-				window.mozCancelAnimationFrame;
-
-			function shuffle(array) { // Fisher–Yates Shuffle
-				var m = array.length, t, i;
-				while(m) {
-					i = Math.floor(Math.random() * m--);
-					t = array[m];
-					array[m] = array[i];
-					array[i] = t;
-				}
-				return array;
-			}
-
-			var tickId = false;
-			var numInputNodes = 3;
-			var numHiddenNodes = 5;
-			var numOutputNodes = 3;
-			var mutationChance = 0.1;
-			var mutationAmount = 0.1;
-			var speedAvgWindow = 50;
-
-			var data = [];
-			var trails = [];
-			var fitnessData = [];
-			var generation = 0;
-			var genome = 0;
-			var currentIndividual;
-			var bestFitness = 0;
-
-			var width = 800;
-			var height = 600;
-			document.getElementById('stats').style.width = width + 'px';
-			var canvas = document.getElementById('canvas');
-			canvas.width = width;
-			canvas.height = height;
-			var ctx = canvas.getContext('2d');
-		    ctx.scale(1, -1);
-		    ctx.translate(0, -height);
-
-			var statWidth = 200;
-			var statHeight = 125;
-			var netCanvas = document.getElementById('net');
-			netCanvas.width = statWidth;
-			netCanvas.height = statHeight;
-			var netCtx = netCanvas.getContext('2d');
-			var netNodeColor = chroma.scale(['aquamarine', '#222222', 'white']).domain([-1, 1]);
-			var netWeightColor = chroma.scale(['aquamarine', '#222222', 'white']).domain([-1, 1]);
-
-			var fitnessCanvas = document.getElementById('fitness');
-			fitnessCanvas.width = statWidth;
-			fitnessCanvas.height = statHeight;
-			var fitnessCtx = fitnessCanvas.getContext('2d');
-		    fitnessCtx.scale(1, -1);
-		    fitnessCtx.translate(0, -statHeight);
-
-			var world = new p2.World({gravity: [0, 0]});
-			world.on('beginContact', function(event) {
-				function updateCheckpoint(body) {
-					var number = Math.max(body.number, currentIndividual.checkpoint.number);
-					if(body.number === 0 && number === checkpoints.length - 1) {
-						number = 0;
-					}
-					currentIndividual.prevFitness += currentIndividual.checkpoint.progress * currentIndividual.checkpoint.distToNext;
-					currentIndividual.checkpoint.progress = 0;
-					currentIndividual.checkpoint.number = number;
-					currentIndividual.checkpoint.distToNext = currentIndividual.distToCheckpoint(number + 1);
-				}
-
-				if(event.shapeA.collisionGroup === checkpointGroup) {
-					updateCheckpoint(event.bodyA);
-				}
-				else if(event.shapeB.collisionGroup === checkpointGroup) {
-					updateCheckpoint(event.bodyB);
-				}
-				else {
-					bestFitness = Math.max(bestFitness, currentIndividual.fitness());
-					currentIndividual.finished = true;
-				}
-			});
-			var wallGroup = 0b10;
-			var checkpointGroup = 0b100;
-			var walls = [];
-			var checkpoints = [];
-			var track = [[130, 110], [150, 320], [90, 420], [110, 520], [400, 540], [650, 500], [700, 420], [660, 360], [560, 360], [400, 400], [320, 360], [340, 280], [450, 200], [660, 245], [685, 120], [600, 65], [305, 75]];
-			var startingPosition = [width / 2, height / 2];
-			var startingAngle = 0;
-
-			var Individual = function(p0, p1) {
-				this.inputLayerWeights = [];
-				this.hiddenLayerWeights = [];
-
-				if(p0 && p1) {
-					for(var i = 0; i < numInputNodes * numHiddenNodes; i++) {
-						if(Math.random() < 0.5) {
-							this.inputLayerWeights.push(p0.inputLayerWeights[i]);
-						}
-						else {
-							this.inputLayerWeights.push(p1.inputLayerWeights[i]);
-						}
-
-						if(Math.random() < mutationChance) {
-							var v = this.inputLayerWeights[i];
-							v += (Math.random() * 2 - 1) * mutationAmount;
-							v = Math.max(-1, Math.min(1, v));
-							this.inputLayerWeights[i] = v;
-						}
-					}
-					for(var i = 0; i < numHiddenNodes * numOutputNodes; i++) {
-						if(Math.random() < 0.5) {
-							this.hiddenLayerWeights.push(p0.hiddenLayerWeights[i]);
-						}
-						else {
-							this.hiddenLayerWeights.push(p1.hiddenLayerWeights[i]);
-						}
-
-						if(Math.random() < mutationChance) {
-							var v = this.inputLayerWeights[i];
-							v += (Math.random() * 2 - 1) * mutationAmount;
-							v = Math.max(-1, Math.min(1, v));
-							this.inputLayerWeights[i] = v;
-						}
-					}
-				}
-				else {
-					for(var i = 0; i < numInputNodes * numHiddenNodes; i++) {
-						this.inputLayerWeights.push(Math.random() * 2 - 1);
-					}
-					for(var i = 0; i < numHiddenNodes * numOutputNodes; i++) {
-						this.hiddenLayerWeights.push(Math.random() * 2 - 1);
-					}
-				}
-
-				this.car = new Car(20, 40);
-				this.checkpoint = {
-					number: -1,
-					distToNext: this.distToCheckpoint(0),
-					progress: 0
-				};
-				this.prevFitness = 0;
-				this.finished = false;
-			};
-
-			Individual.prototype.loadWeights = function(input, hidden) {
-				this.inputLayerWeights = input;
-				this.hiddenLayerWeights = hidden;
-			}
-
-			Individual.prototype.setSimulation = function() {
-				world.clear();
-				world.gravity = [0, 0];
-
-				addTrack();
-
-				this.car = new Car(20, 40);
-				trails.push([p2.vec2.clone(this.car.chassis.body.position)]);
-				world.addBody(this.car.chassis.body);
-				this.car.tdv.addToWorld(world);
-
-				drawNetWeights(this);
-				drawNetNodes(Array(numInputNodes).fill(0), Array(numHiddenNodes).fill(0), Array(numOutputNodes).fill(0));
-				fitnessData = [];
-				this.checkpoint = {
-					number: -1,
-					distToNext: this.distToCheckpoint(0),
-					progress: 0
-				};
-				this.prevFitness = 0;
-				this.finished = false;
-
-				currentIndividual = this;
-			};
-
-			Individual.prototype.update = function() {
-				this.car.update();
-				fitnessData.push({
-					fitness: this.fitness(),
-					speed: this.car.avgSpeed
-				});
-
-				if(this.car.speeds.length == speedAvgWindow && this.car.avgSpeed < 1) {
-					bestFitness = Math.max(bestFitness, this.fitness());
-					this.finished = true;
-				}
-
-				var inputLayer = this.car.getDistances();
-				var hiddenLayer = [0, 0, 0, 0, 0];
-				var outputLayer = [0, 0, 0];
-
-				for(var i = 0; i < numHiddenNodes; i++) {
-					for(var j = 0; j < numInputNodes; j++) {
-						hiddenLayer[i] += inputLayer[j] * this.inputLayerWeights[i * numInputNodes + j];
-					}
-				}
-
-				for(var i = 0; i < numOutputNodes; i++) {
-					for(var j = 0; j < numHiddenNodes; j++) {
-						outputLayer[i] += hiddenLayer[j] * this.hiddenLayerWeights[i * numHiddenNodes + j];
-					}
-				}
-
-				for(var i = 0; i < numOutputNodes; i++) {
-					outputLayer[i] = Math.min(Math.max(0, Math.abs(outputLayer[i])), 1);
-				}
-
-				drawNetNodes(inputLayer, hiddenLayer, outputLayer);
-				this.car.steer = outputLayer[0];
-				this.car.throttle = outputLayer[1];
-				this.car.brake = outputLayer[2];
-
-				if(this.checkpoint.distToNext === 0) {
-					this.checkpoint.progress = 0;
-				}
-				else {
-					this.checkpoint.progress = 1 - this.distToCheckpoint(this.checkpoint.number + 1) / this.checkpoint.distToNext;
-				}
-
-				trails[genome].push(p2.vec2.clone(this.car.chassis.body.position));
-				document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
-				document.querySelector('#individual').innerHTML = 'Fitness: ' + this.fitness().toFixed(2) + ', Avg. Speed: ' + this.car.avgSpeed.toFixed(2);
-			};
-
-			Individual.prototype.distToCheckpoint = function(number) {
-				var carBody = this.car.chassis.body;
-				var checkpoint = checkpoints[number % checkpoints.length];
-				return p2.vec2.dist(carBody.position, checkpoint.position);
-			};
-
-			Individual.prototype.fitness = function() {
-				return this.prevFitness + this.checkpoint.progress * this.checkpoint.distToNext;
-			};
-
-			var Car = function(bodyWidth, bodyHeight) {
-				var chassisBody = new p2.Body({
-					mass: 1,
-					position: p2.vec2.clone(startingPosition),
-					angle: startingAngle
-				});
-				var boxShape = new p2.Box({
-					width: bodyWidth,
-					height: bodyHeight,
-					collisionMask: wallGroup | checkpointGroup
-				});
-				chassisBody.addShape(boxShape);
-
-				var vehicle = new p2.TopDownVehicle(chassisBody);
-				var flWheel = vehicle.addWheel({localPosition: [-bodyWidth / 2,  bodyHeight / 2]});
-				var frWheel = vehicle.addWheel({localPosition: [ bodyWidth / 2,  bodyHeight / 2]});
-				var blWheel = vehicle.addWheel({localPosition: [-bodyWidth / 2, -bodyHeight / 2]});
-				var brWheel = vehicle.addWheel({localPosition: [ bodyWidth / 2, -bodyHeight / 2]});
-				flWheel.setSideFriction(400);
-				frWheel.setSideFriction(400);
-				blWheel.setSideFriction(300);
-				brWheel.setSideFriction(300);
-
-				flWheel.setBrakeForce(20);
-				frWheel.setBrakeForce(20);
-
-				var lSensor = new p2.Ray({
-					mode: p2.Ray.CLOSEST,
-					collisionMask: wallGroup
-				});
-				var fSensor = new p2.Ray({
-					mode: p2.Ray.CLOSEST,
-					collisionMask: wallGroup
-				});
-				var rSensor = new p2.Ray({
-					mode: p2.Ray.CLOSEST,
-					collisionMask: wallGroup
-				});
-
-				this.tdv = vehicle;
-				this.chassis = {
-					body: chassisBody,
-					box: boxShape
-				};
-				this.wheels = [flWheel, frWheel, blWheel, brWheel];
-				this.lSensor = lSensor;
-				this.fSensor = fSensor;
-				this.rSensor = rSensor;
-
-				this.speeds = [];
-				this.avgSpeed = 0;
-				this.steer = 0.5;
-				this.throttle = 0;
-				this.brake = 0;
-			};
-
-			Car.prototype.getDistances = function() {
-				var distances = [1, 1, 1];
-				var result = new p2.RaycastResult();
-				world.raycast(result, this.lSensor);
-				drawSensor(result, this.lSensor);
-				if(result.hasHit()) {
-					distances[0] = result.getHitDistance(this.lSensor) / 100;
-				}
-				result.reset();
-				world.raycast(result, this.fSensor);
-				drawSensor(result, this.fSensor);
-				if(result.hasHit()) {
-					distances[1] = result.getHitDistance(this.fSensor) / 100;
-				}
-				result.reset();
-				world.raycast(result, this.rSensor);
-				drawSensor(result, this.rSensor);
-				if(result.hasHit()) {
-					distances[2] = result.getHitDistance(this.rSensor) / 100;
-				}
-
-				return distances;
-			};
-
-			Car.prototype.update = function() {
-				this.speeds.push((this.wheels[2].getSpeed() + this.wheels[3].getSpeed()) / 2);
-				while(this.speeds.length > speedAvgWindow) {
-					this.speeds.shift();
-				}
-
-				var sum = 0;
-				for(var i = 0; i < this.speeds.length; i++) {
-					sum += this.speeds[i];
-				}
-				this.avgSpeed = sum / this.speeds.length;
-
-				var steerValue = 0.63 * -(this.steer * 2 - 1);
-				var engineForce = 150 * this.throttle;
-				var brakeForce = 150 * this.brake;
-
-				this.wheels[0].steerValue = steerValue;
-				this.wheels[1].steerValue = steerValue;
-
-				this.wheels[2].engineForce = engineForce;
-				this.wheels[3].engineForce = engineForce;
-
-				this.wheels[2].setBrakeForce(brakeForce);
-				this.wheels[3].setBrakeForce(brakeForce);
-
-				var w = this.chassis.box.width * 9 / 10;
-				var h = this.chassis.box.height * 9 / 10;
-				var sensorPositions = [];
-				sensorPositions.push([-w / 2, h / 2]);
-				sensorPositions.push([     0, h / 2]);
-				sensorPositions.push([ w / 2, h / 2]);
-				var d = 100 / Math.sqrt(2);
-				sensorPositions.push([-w / 2 - d, h / 2 + d]);
-				sensorPositions.push([     0    , h / 2 + 100]);
-				sensorPositions.push([ w / 2 + d, h / 2 + d]);
-				for(var i = 0; i < sensorPositions.length; i++) {
-					p2.vec2.rotate(sensorPositions[i], sensorPositions[i], this.chassis.body.angle);
-					p2.vec2.add(sensorPositions[i], sensorPositions[i], this.chassis.body.position);
-				}
-
-				this.lSensor.from = sensorPositions[0];
-				this.lSensor.to = sensorPositions[3];
-				this.fSensor.from = sensorPositions[1];
-				this.fSensor.to = sensorPositions[4];
-				this.rSensor.from = sensorPositions[2];
-				this.rSensor.to = sensorPositions[5];
-
-				this.lSensor.update();
-				this.fSensor.update();
-				this.rSensor.update();
-			};
-
-			Car.prototype.draw = function() {
-				ctx.strokeStyle = 'white';
-		        var x = this.chassis.body.position[0];
-		        var y = this.chassis.body.position[1];
-				var w = this.chassis.box.width;
-				var h = this.chassis.box.height;
-
-		        ctx.save();
-		        ctx.translate(x, y);
-		        ctx.rotate(this.chassis.body.angle);
-
-				ctx.translate(-w / 2, -h / 2);
-				ctx.beginPath();
-				ctx.rect(0, 0, w, h);
-				ctx.translate(w / 2, h / 2);
-
-				var wheelWidth = w / 6;
-				var wheelHeight = h / 6;
-				for(var i = 0; i < this.wheels.length; i++) {
-					var w = this.wheels[i];
-					var x = w.localPosition[0];
-					var y = Math.sign(w.localPosition[1]) * (Math.abs(w.localPosition[1]) - wheelHeight);
-
-					ctx.save();
-					ctx.translate(x, y);
-					if(i < 2) {
-						ctx.rotate(0.63 * -(this.steer * 2 - 1));
-					}
-			        ctx.translate(-wheelWidth / 2, -wheelHeight / 2);
-
-					ctx.rect(0, 0, wheelWidth, wheelHeight);
-			        ctx.restore();
-				}
-
-				ctx.stroke();
-		        ctx.restore();
-			};
-
-			function buildWall(pt0, pt1) {
-				var wall = new p2.Body({
-					position: [(pt0[0] + pt1[0]) / 2, (pt0[1] + pt1[1]) / 2],
-					angle: Math.atan2(pt1[1] - pt0[1], pt1[0] - pt0[0])
-				});
-				wall.addShape(new p2.Box({
-					width: p2.vec2.dist(pt0, pt1),
-					height: 5,
-					collisionGroup: wallGroup
-				}));
-
-				return wall;
-			}
-
-			function buildCheckpoint(pt0, pt1) {
-				var checkpoint = new p2.Body({
-					position: [(pt0[0] + pt1[0]) / 2, (pt0[1] + pt1[1]) / 2],
-					angle: Math.atan2(pt1[1] - pt0[1], pt1[0] - pt0[0])
-				});
-				checkpoint.addShape(new p2.Box({
-					width: p2.vec2.dist(pt0, pt1),
-					height: 0.5,
-					sensor: true,
-					collisionGroup: checkpointGroup
-				}));
-
-				return checkpoint;
-			}
-
-			function buildTrack(trackPoints) {
-				if(trackPoints.length > 1) {
-					walls = [];
-					checkpoints = [];
-
-					var points = trackPoints.slice(0);
-					var pathWidth = 80;
-
-					points.push(points[0]);
-					points.push(points[1]);
-
-					var innerPoints = [];
-					var outerPoints = [];
-
-					var x = points[0][0];
-					var y = points[0][1];
-					var x1 = points[1][0];
-					var y1 = points[1][1];
-					var prevAngle = Math.atan2(y1 - y, x1 - x);
-					startingPosition = points[0];
-					startingAngle = prevAngle - Math.PI / 2;
-
-					for(var i = 0; i < points.length - 1; i++) {
-						var x = points[i][0];
-						var y = points[i][1];
-						var x1 = points[i + 1][0];
-						var y1 = points[i + 1][1];
-
-						var angle = Math.atan2(y1 - y, x1 - x);
-						var pathAngle = Math.PI + angle - prevAngle;
-
-						var shift = [Math.cos(pathAngle / 2 + prevAngle), Math.sin(pathAngle / 2 + prevAngle)];
-						p2.vec2.scale(shift, shift, (pathWidth + 5) / 2 / Math.sin(pathAngle / 2));
-
-						var inPt = p2.vec2.add([0, 0], points[i], shift);
-						var outPt = p2.vec2.sub([0, 0], points[i], shift);
-
-						innerPoints.push(inPt);
-						outerPoints.push(outPt);
-
-						if(i === points.length - 2) {
-							innerPoints[0] = inPt;
-							outerPoints[0] = outPt;
-							var checkpoint = buildCheckpoint(inPt, outPt);
-							checkpoint.number = 0;
-							checkpoints[0] = checkpoint;
-						}
-						else {
-							var checkpoint = buildCheckpoint(inPt, outPt);
-							checkpoint.number = checkpoints.length;
-							checkpoints.push(checkpoint);
-						}
-
-						prevAngle = angle;
-					}
-
-					for(var i = 0; i < innerPoints.length - 1; i++) {
-						walls.push(buildWall(innerPoints[i], innerPoints[i + 1]));
-					}
-					for(var i = 0; i < outerPoints.length - 1; i++) {
-						walls.push(buildWall(outerPoints[i], outerPoints[i + 1]));
-					}
-				}
-
-				var top = new p2.Body({position: [width / 2, 0]});
-				top.addShape(new p2.Box({
-					width: width,
-					height: 10,
-					collisionGroup: wallGroup
-				}));
-				walls.push(top);
-				var bottom = new p2.Body({position: [width / 2, height]});
-				bottom.addShape(new p2.Box({
-					width: width,
-					height: 10,
-					collisionGroup: wallGroup
-				}));
-				walls.push(bottom);
-				var left = new p2.Body({position: [0, height / 2]});
-				left.addShape(new p2.Box({
-					width: 10,
-					height: height,
-					collisionGroup: wallGroup
-				}));
-				walls.push(left);
-				var right = new p2.Body({position: [width, height / 2]});
-				right.addShape(new p2.Box({
-					width: 10,
-					height: height,
-					collisionGroup: wallGroup
-				}));
-				walls.push(right);
-			}
-
-			function addTrack() {
-				for(var i = 0; i < walls.length; i++) {
-					world.addBody(walls[i]);
-				}
-				for(var i = 0; i < checkpoints.length; i++) {
-					world.addBody(checkpoints[i]);
-				}
-			}
-
-			function drawWall(wall) {
-				ctx.strokeStyle = 'white';
-				ctx.beginPath();
-				ctx.save();
-				ctx.translate(wall.position[0], wall.position[1]);
-				ctx.rotate(wall.angle);
-				ctx.clearRect(-wall.shapes[0].width / 2, -wall.shapes[0].height / 2, wall.shapes[0].width, wall.shapes[0].height);
-				ctx.rect(-wall.shapes[0].width / 2, -wall.shapes[0].height / 2, wall.shapes[0].width, wall.shapes[0].height);
-				ctx.stroke();
-				ctx.restore();
-			}
-
-			function drawSensor(result, ray) {
-				ctx.strokeStyle = '#ff5050';
-				ctx.beginPath();
-				ctx.moveTo(ray.from[0], ray.from[1]);
-				ctx.lineTo(ray.to[0], ray.to[1]);
-				ctx.stroke();
-
-				var hitPoint = p2.vec2.create();
-				result.getHitPoint(hitPoint, ray);
-
-				if(result.hasHit()) {
-					ctx.beginPath();
-					ctx.arc(hitPoint[0], hitPoint[1], 5, 0, 2 * Math.PI);
-					ctx.stroke();
-				}
-
-				ctx.beginPath();
-				ctx.moveTo(hitPoint[0], hitPoint[1]);
-				ctx.lineTo(hitPoint[0] + result.normal[0] * 10, hitPoint[1] + result.normal[1] * 10);
-				ctx.stroke();
-			}
-
-			function drawCheckpoint(checkpoint) {
-				ctx.beginPath();
-				ctx.save();
-				ctx.translate(checkpoint.position[0], checkpoint.position[1]);
-				ctx.rotate(checkpoint.angle);
-				ctx.rect(-checkpoint.shapes[0].width / 2, -checkpoint.shapes[0].height / 2, checkpoint.shapes[0].width, checkpoint.shapes[0].height);
-				ctx.stroke();
-				ctx.restore();
-			}
-
-			function drawCross(pt) {
-				ctx.strokeStyle = '#ff5050';
-				ctx.beginPath();
-				ctx.save();
-				ctx.translate(pt[0], pt[1]);
-				ctx.moveTo(-4, -4);
-				ctx.lineTo(4, 4);
-				ctx.moveTo(-4, 4);
-				ctx.lineTo(4, -4);
-				ctx.stroke();
-				ctx.restore();
-			}
-
-			function drawFitness(individual) {
-				fitnessCtx.clearRect(0, 0, statWidth, statHeight);
-
-				fitnessCtx.fillStyle = 'white';
-				fitnessCtx.fillRect(Math.min(statWidth / 2, individual.car.steer * statWidth), 0, Math.abs(individual.car.steer - 0.5) * statWidth, statHeight / 10);
-				fitnessCtx.fillRect(statWidth / 9, statHeight / 10, statWidth / 3, individual.car.throttle * statHeight * 9 / 10);
-				fitnessCtx.fillStyle = '#ff5050';
-				fitnessCtx.fillRect(statWidth * 5 / 9, statHeight / 10, statWidth / 3, individual.car.brake * statHeight * 9 / 10);
-
-				fitnessCtx.strokeStyle = 'aqua';
-				fitnessCtx.beginPath();
-				var max = 0;
-				for(var i = 0; i < fitnessData.length; i++) {
-					max = Math.max(max, fitnessData[i].speed);
-				}
-				fitnessCtx.moveTo(0, fitnessData[0].speed / max * statHeight);
-				for(var i = 1; i < fitnessData.length; i++) {
-					fitnessCtx.lineTo(i / fitnessData.length * statWidth, fitnessData[i].speed / max * statHeight);
-				}
-				fitnessCtx.stroke();
-
-				fitnessCtx.strokeStyle = 'aquamarine';
-				fitnessCtx.beginPath();
-				max = bestFitness;
-				for(var i = 0; i < fitnessData.length; i++) {
-					max = Math.max(max, fitnessData[i].fitness);
-				}
-				max *= 1.1;
-				fitnessCtx.moveTo(0, fitnessData[0].fitness / max * statHeight);
-				for(var i = 1; i < fitnessData.length; i++) {
-					fitnessCtx.lineTo(i / fitnessData.length * statWidth, fitnessData[i].fitness / max * statHeight);
-				}
-				fitnessCtx.stroke();
-
-				fitnessCtx.strokeStyle = '#ff5050';
-				fitnessCtx.beginPath();
-				fitnessCtx.moveTo(0, bestFitness / max * statHeight);
-				fitnessCtx.lineTo(statWidth, bestFitness / max * statHeight);
-				fitnessCtx.stroke();
-			}
-
-			function drawNetWeights(individual) {
-				netCtx.clearRect(0, 0, statWidth, statHeight);
-
-				for(var i = 0; i < numInputNodes; i++) {
-					var p = (i + 0.5) / numInputNodes;
-					for(var j = 0; j < numHiddenNodes; j++) {
-						var pn = (j + 0.5) / numHiddenNodes;
-						var w = individual.inputLayerWeights[i * numHiddenNodes + j];
-						netCtx.strokeStyle = netWeightColor(w);
-						netCtx.beginPath();
-						netCtx.moveTo(30, p * statHeight);
-						netCtx.lineTo(statWidth / 2, pn * statHeight);
-						netCtx.stroke();
-					}
-				}
-				for(var i = 0; i < numHiddenNodes; i++) {
-					var p = (i + 0.5) / numHiddenNodes;
-					for(var j = 0; j < numOutputNodes; j++) {
-						var pn = (j + 0.5) / numOutputNodes;
-						var w = individual.hiddenLayerWeights[i * numOutputNodes + j];
-						netCtx.strokeStyle = netWeightColor(w);
-						netCtx.beginPath();
-						netCtx.moveTo(statWidth / 2, p * statHeight);
-						netCtx.lineTo(statWidth - 30, pn * statHeight);
-						netCtx.stroke();
-					}
-				}
-			}
-
-			function drawNetNodes(input, hidden, output) {
-				for(var i = 0; i < input.length; i++) {
-					var p = (i + 0.5) / input.length;
-					var w = input[i];
-					netCtx.fillStyle = netNodeColor(w);
-					netCtx.beginPath();
-					netCtx.arc(30, p * statHeight, 5, 0, 2 * Math.PI);
-					netCtx.fill();
-				}
-				for(var i = 0; i < hidden.length; i++) {
-					var p = (i + 0.5) / hidden.length;
-					var w = hidden[i];
-					netCtx.fillStyle = netNodeColor(w);
-					netCtx.beginPath();
-					netCtx.arc(statWidth / 2, p * statHeight, 5, 0, 2 * Math.PI);
-					netCtx.fill();
-				}
-				for(var i = 0; i < output.length; i++) {
-					var p = (i + 0.5) / output.length;
-					var w = output[i];
-					netCtx.fillStyle = netNodeColor(w);
-					netCtx.beginPath();
-					netCtx.arc(statWidth - 30, p * statHeight, 5, 0, 2 * Math.PI);
-					netCtx.fill();
-				}
-			}
-
-			function makeNewPopulation() {
-				trails = [];
-				genome = 0;
-				if(generation == 0) {
-					data = [];
-					for(var i = 0; i < 20; i++) {
-						data.push(new Individual());
-					}
-					// data[0].loadWeights([-0.7733835869223846, 0.6912134550870966, 0.5200670862577853, 0.010066281266006852, -0.5835689638660787, 0.8593150302810204, 0.26383433483466945, 0.9188772623254501, 0.31082387838616016, -0.9230020957835063, -0.7608622651918358, 0.30120385825322604, -0.14702176464584205, 0.7945683676145202, 0.007116911217986167], [0.9611058622695274, 0.4453658472827804, 0.5119108361151719, 0.3207568399123908, -0.4422832359833526, -0.7372888053877926, -0.1949370821845664, 0.874614217636968, -0.7331837892749098, 0.9683396872537071, 0.16838989173208696, 0.19111659656828306, -0.2644370555293081, -0.07536544694538527, 0.6761137178251246]);
-				}
-				else {
-					var datalen = data.length;
-					data = data.sort(function(a, b) {
-						return b.fitness() - a.fitness();
-					});
-
-					var breeders = data.slice(0, Math.max(2, ~~(datalen * 0.15)));
-					data = [breeders[0]];
-					for(var i = data.length; i < datalen - 1; i++) {
-						breeders = shuffle(breeders);
-						data.push(new Individual(breeders[0], breeders[1]));
-					}
-					data.push(new Individual());
-				}
-			}
-
-			function tick(time) {
-				world.step(1 / 60);
-				ctx.clearRect(0, 0, width, height);
-
-				for(var i = 0; i < walls.length; i++) {
-					drawWall(walls[i]);
-				}
-				for(var i = 0; i < checkpoints.length; i++) {
-					ctx.strokeStyle = 'rgba(255, 80, 80, 0.3)';
-					if(currentIndividual && currentIndividual.checkpoint.number >= i) {
-						ctx.strokeStyle = '#ff5050';
-					}
-					drawCheckpoint(checkpoints[i]);
-				}
-
-				for(var i = 0; i < trails.length; i++) {
-					ctx.strokeStyle = i === trails.length - 1 ? 'aquamarine' : 'rgba(255, 255, 255, 0.15)';
-					ctx.beginPath();
-					ctx.moveTo(trails[i][0][0], trails[i][0][1]);
-					for(var j = 1; j < trails[i].length; j++) {
-						ctx.lineTo(trails[i][j][0], trails[i][j][1]);
-					}
-					ctx.stroke();
-					if(i !== genome) {
-						drawCross(trails[i][trails[i].length - 1]);
-					}
-				}
-
-				if(currentIndividual) {
-					currentIndividual.update();
-					currentIndividual.car.draw();
-					drawFitness(currentIndividual);
-
-					if(currentIndividual.finished) {
-						genome++;
-						if(genome >= data.length) {
-							generation++;
-							makeNewPopulation();
-						}
-
-						currentIndividual = data[genome];
-						currentIndividual.setSimulation();
-						document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
-					}
-				}
-
-				tickId = requestAnimFrame(tick);
-			}
-
-			function start() {
-				if(!tickId) {
-					data[0].setSimulation();
-					document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
-					tick();
-				}
-			}
-
-			function kill() {
-				if(currentIndividual) {
-					bestFitness = Math.max(bestFitness, currentIndividual.fitness());
-					currentIndividual.finished = true;
-				}
-			}
-
-			function reset() {
-				buildTrack(track);
-
-				cancelAnimFrame(tickId);
-				tickId = false;
-
-				ctx.clearRect(0, 0, width, height);
-				netCtx.clearRect(0, 0, statWidth, statHeight);
-				fitnessCtx.clearRect(0, 0, statWidth, statHeight);
-
-				for(var i = 0; i < walls.length; i++) {
-					drawWall(walls[i]);
-				}
-				ctx.strokeStyle = 'rgba(255, 80, 80, 0.3)';
-				for(var i = 0; i < checkpoints.length; i++) {
-					drawCheckpoint(checkpoints[i]);
-				}
-
-				currentIndividual = undefined;
-				bestFitness = 0;
-				generation = 0;
-				genome = 0;
-				makeNewPopulation();
-				document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
-				document.querySelector('#individual').innerHTML = 'Fitness: 0.00, Avg. Speed: 0.00';
-			}
-
-			reset();
-		</script>
-	</body>
+    <head>
+        <title>Driving Simulation</title>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <script type="text/javascript" src="node_modules/p2/build/p2.js"></script>
+        <script type="text/javascript" src="node_modules/chroma-js/chroma.js"></script>
+        <style type="text/css">
+            html, body {
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                height: 100%;
+                color: white;
+                background-color: #121212;
+                text-align: center;
+            }
+
+            button {
+                background-color: #121212;
+                color: whitesmoke;
+                border: 2px solid whitesmoke;
+                border-radius: 0;
+                padding: 7px 14px;
+                margin-left: -2px;
+                font-weight: bold;
+                cursor: pointer;
+            }
+
+            button:hover, button:focus {
+                outline: none;
+                background-color: #333333;
+            }
+
+            button:first-child {
+                margin-left: 0;
+                border-top-left-radius: 4px;
+                border-bottom-left-radius: 4px;
+            }
+
+            button:last-child {
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+
+            .container {
+                margin: 10px;
+            }
+
+            canvas {
+                border: 1px solid #222222;
+            }
+
+            #canvas {
+                border-color: white;
+            }
+
+            #stats {
+                margin: 10px auto;
+            }
+
+            #stats::after {
+                content: '';
+                display: block;
+                clear: both;
+            }
+
+            #net {
+                float: left;
+            }
+
+            #genetic, #individual {
+                font-family: monospace;
+            }
+
+            #fitness {
+                float: right;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div id="stats">
+                <canvas id="net"></canvas>
+                <div style="display: inline-block;">
+                    <div id="genetic">Generation: 0, Genome: 0<br>Best Fitness: 0.00</div>
+                    <div id="individual">Fitness: 0.00, Avg. Speed: 0.00</div>
+                    <br>
+                    <div><button onclick="start();">Start</button><button onclick="kill();">Kill Current Simulation</button><button onclick="reset();">Reset</button></div>
+                </div>
+                <canvas id="fitness"></canvas>
+            </div>
+            <canvas id="canvas"></canvas>
+        </div>
+        <script type="text/javascript">
+            'use strict';
+
+            window.requestAnimFrame =
+                window.requestAnimationFrame ||
+                window.webkitRequestAnimationFrame ||
+                window.mozRequestAnimationFrame ||
+                window.oRequestAnimationFrame ||
+                window.msRequestAnimationFrame ||
+                function(callback) {
+                    window.setTimeout(callback, 1000 / 60);
+                };
+
+            window.cancelAnimFrame =
+                window.cancelAnimationFrame ||
+                window.mozCancelAnimationFrame;
+
+            function shuffle(array) { // Fisher–Yates Shuffle
+                var m = array.length, t, i;
+                while(m) {
+                    i = Math.floor(Math.random() * m--);
+                    t = array[m];
+                    array[m] = array[i];
+                    array[i] = t;
+                }
+                return array;
+            }
+
+            var tickId = false;
+            var numInputNodes = 3;
+            var numHiddenNodes = 5;
+            var numOutputNodes = 3;
+            var mutationChance = 0.1;
+            var mutationAmount = 0.1;
+            var speedAvgWindow = 50;
+
+            var data = [];
+            var trails = [];
+            var fitnessData = [];
+            var generation = 0;
+            var genome = 0;
+            var currentIndividual;
+            var bestFitness = 0;
+
+            var width = 800;
+            var height = 600;
+            document.getElementById('stats').style.width = width + 'px';
+            var canvas = document.getElementById('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            var ctx = canvas.getContext('2d');
+            ctx.scale(1, -1);
+            ctx.translate(0, -height);
+
+            var statWidth = 200;
+            var statHeight = 125;
+            var netCanvas = document.getElementById('net');
+            netCanvas.width = statWidth;
+            netCanvas.height = statHeight;
+            var netCtx = netCanvas.getContext('2d');
+            var netNodeColor = chroma.scale(['aquamarine', '#222222', 'white']).domain([-1, 1]);
+            var netWeightColor = chroma.scale(['aquamarine', '#222222', 'white']).domain([-1, 1]);
+
+            var fitnessCanvas = document.getElementById('fitness');
+            fitnessCanvas.width = statWidth;
+            fitnessCanvas.height = statHeight;
+            var fitnessCtx = fitnessCanvas.getContext('2d');
+            fitnessCtx.scale(1, -1);
+            fitnessCtx.translate(0, -statHeight);
+
+            var world = new p2.World({gravity: [0, 0]});
+            world.on('beginContact', function(event) {
+                function updateCheckpoint(body) {
+                    var number = Math.max(body.number, currentIndividual.checkpoint.number);
+                    if(body.number === 0 && number === checkpoints.length - 1) {
+                        number = 0;
+                    }
+                    currentIndividual.prevFitness += currentIndividual.checkpoint.progress * currentIndividual.checkpoint.distToNext;
+                    currentIndividual.checkpoint.progress = 0;
+                    currentIndividual.checkpoint.number = number;
+                    currentIndividual.checkpoint.distToNext = currentIndividual.distToCheckpoint(number + 1);
+                }
+
+                if(event.shapeA.collisionGroup === checkpointGroup) {
+                    updateCheckpoint(event.bodyA);
+                }
+                else if(event.shapeB.collisionGroup === checkpointGroup) {
+                    updateCheckpoint(event.bodyB);
+                }
+                else {
+                    bestFitness = Math.max(bestFitness, currentIndividual.fitness());
+                    currentIndividual.finished = true;
+                }
+            });
+            var wallGroup = 0b10;
+            var checkpointGroup = 0b100;
+            var walls = [];
+            var checkpoints = [];
+            var track = [[130, 110], [150, 320], [90, 420], [110, 520], [400, 540], [650, 500], [700, 420], [660, 360], [560, 360], [400, 400], [320, 360], [340, 280], [450, 200], [660, 245], [685, 120], [600, 65], [305, 75]];
+            var startingPosition = [width / 2, height / 2];
+            var startingAngle = 0;
+
+            var Individual = function(p0, p1) {
+                this.inputLayerWeights = [];
+                this.hiddenLayerWeights = [];
+
+                if(p0 && p1) {
+                    for(var i = 0; i < numInputNodes * numHiddenNodes; i++) {
+                        if(Math.random() < 0.5) {
+                            this.inputLayerWeights.push(p0.inputLayerWeights[i]);
+                        }
+                        else {
+                            this.inputLayerWeights.push(p1.inputLayerWeights[i]);
+                        }
+
+                        if(Math.random() < mutationChance) {
+                            var v = this.inputLayerWeights[i];
+                            v += (Math.random() * 2 - 1) * mutationAmount;
+                            v = Math.max(-1, Math.min(1, v));
+                            this.inputLayerWeights[i] = v;
+                        }
+                    }
+                    for(var i = 0; i < numHiddenNodes * numOutputNodes; i++) {
+                        if(Math.random() < 0.5) {
+                            this.hiddenLayerWeights.push(p0.hiddenLayerWeights[i]);
+                        }
+                        else {
+                            this.hiddenLayerWeights.push(p1.hiddenLayerWeights[i]);
+                        }
+
+                        if(Math.random() < mutationChance) {
+                            var v = this.inputLayerWeights[i];
+                            v += (Math.random() * 2 - 1) * mutationAmount;
+                            v = Math.max(-1, Math.min(1, v));
+                            this.inputLayerWeights[i] = v;
+                        }
+                    }
+                }
+                else {
+                    for(var i = 0; i < numInputNodes * numHiddenNodes; i++) {
+                        this.inputLayerWeights.push(Math.random() * 2 - 1);
+                    }
+                    for(var i = 0; i < numHiddenNodes * numOutputNodes; i++) {
+                        this.hiddenLayerWeights.push(Math.random() * 2 - 1);
+                    }
+                }
+
+                this.car = new Car(20, 40);
+                this.checkpoint = {
+                    number: -1,
+                    distToNext: this.distToCheckpoint(0),
+                    progress: 0
+                };
+                this.prevFitness = 0;
+                this.finished = false;
+            };
+
+            Individual.prototype.loadWeights = function(input, hidden) {
+                this.inputLayerWeights = input;
+                this.hiddenLayerWeights = hidden;
+            }
+
+            Individual.prototype.setSimulation = function() {
+                world.clear();
+                world.gravity = [0, 0];
+
+                addTrack();
+
+                this.car = new Car(20, 40);
+                trails.push([p2.vec2.clone(this.car.chassis.body.position)]);
+                world.addBody(this.car.chassis.body);
+                this.car.tdv.addToWorld(world);
+
+                drawNetWeights(this);
+                drawNetNodes(Array(numInputNodes).fill(0), Array(numHiddenNodes).fill(0), Array(numOutputNodes).fill(0));
+                fitnessData = [];
+                this.checkpoint = {
+                    number: -1,
+                    distToNext: this.distToCheckpoint(0),
+                    progress: 0
+                };
+                this.prevFitness = 0;
+                this.finished = false;
+
+                currentIndividual = this;
+            };
+
+            Individual.prototype.update = function() {
+                this.car.update();
+                fitnessData.push({
+                    fitness: this.fitness(),
+                    speed: this.car.avgSpeed
+                });
+
+                if(this.car.speeds.length == speedAvgWindow && this.car.avgSpeed < 1) {
+                    bestFitness = Math.max(bestFitness, this.fitness());
+                    this.finished = true;
+                }
+
+                var inputLayer = this.car.getDistances();
+                var hiddenLayer = [0, 0, 0, 0, 0];
+                var outputLayer = [0, 0, 0];
+
+                for(var i = 0; i < numHiddenNodes; i++) {
+                    for(var j = 0; j < numInputNodes; j++) {
+                        hiddenLayer[i] += inputLayer[j] * this.inputLayerWeights[i * numInputNodes + j];
+                    }
+                }
+
+                for(var i = 0; i < numOutputNodes; i++) {
+                    for(var j = 0; j < numHiddenNodes; j++) {
+                        outputLayer[i] += hiddenLayer[j] * this.hiddenLayerWeights[i * numHiddenNodes + j];
+                    }
+                }
+
+                for(var i = 0; i < numOutputNodes; i++) {
+                    outputLayer[i] = Math.min(Math.max(0, Math.abs(outputLayer[i])), 1);
+                }
+
+                drawNetNodes(inputLayer, hiddenLayer, outputLayer);
+                this.car.steer = outputLayer[0];
+                this.car.throttle = outputLayer[1];
+                this.car.brake = outputLayer[2];
+
+                if(this.checkpoint.distToNext === 0) {
+                    this.checkpoint.progress = 0;
+                }
+                else {
+                    this.checkpoint.progress = 1 - this.distToCheckpoint(this.checkpoint.number + 1) / this.checkpoint.distToNext;
+                }
+
+                trails[genome].push(p2.vec2.clone(this.car.chassis.body.position));
+                document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
+                document.querySelector('#individual').innerHTML = 'Fitness: ' + this.fitness().toFixed(2) + ', Avg. Speed: ' + this.car.avgSpeed.toFixed(2);
+            };
+
+            Individual.prototype.distToCheckpoint = function(number) {
+                var carBody = this.car.chassis.body;
+                var checkpoint = checkpoints[number % checkpoints.length];
+                return p2.vec2.dist(carBody.position, checkpoint.position);
+            };
+
+            Individual.prototype.fitness = function() {
+                return this.prevFitness + this.checkpoint.progress * this.checkpoint.distToNext;
+            };
+
+            var Car = function(bodyWidth, bodyHeight) {
+                var chassisBody = new p2.Body({
+                    mass: 1,
+                    position: p2.vec2.clone(startingPosition),
+                    angle: startingAngle
+                });
+                var boxShape = new p2.Box({
+                    width: bodyWidth,
+                    height: bodyHeight,
+                    collisionMask: wallGroup | checkpointGroup
+                });
+                chassisBody.addShape(boxShape);
+
+                var vehicle = new p2.TopDownVehicle(chassisBody);
+                var flWheel = vehicle.addWheel({localPosition: [-bodyWidth / 2,  bodyHeight / 2]});
+                var frWheel = vehicle.addWheel({localPosition: [ bodyWidth / 2,  bodyHeight / 2]});
+                var blWheel = vehicle.addWheel({localPosition: [-bodyWidth / 2, -bodyHeight / 2]});
+                var brWheel = vehicle.addWheel({localPosition: [ bodyWidth / 2, -bodyHeight / 2]});
+                flWheel.setSideFriction(400);
+                frWheel.setSideFriction(400);
+                blWheel.setSideFriction(300);
+                brWheel.setSideFriction(300);
+
+                flWheel.setBrakeForce(20);
+                frWheel.setBrakeForce(20);
+
+                var lSensor = new p2.Ray({
+                    mode: p2.Ray.CLOSEST,
+                    collisionMask: wallGroup
+                });
+                var fSensor = new p2.Ray({
+                    mode: p2.Ray.CLOSEST,
+                    collisionMask: wallGroup
+                });
+                var rSensor = new p2.Ray({
+                    mode: p2.Ray.CLOSEST,
+                    collisionMask: wallGroup
+                });
+
+                this.tdv = vehicle;
+                this.chassis = {
+                    body: chassisBody,
+                    box: boxShape
+                };
+                this.wheels = [flWheel, frWheel, blWheel, brWheel];
+                this.lSensor = lSensor;
+                this.fSensor = fSensor;
+                this.rSensor = rSensor;
+
+                this.speeds = [];
+                this.avgSpeed = 0;
+                this.steer = 0.5;
+                this.throttle = 0;
+                this.brake = 0;
+            };
+
+            Car.prototype.getDistances = function() {
+                var distances = [1, 1, 1];
+                var result = new p2.RaycastResult();
+                world.raycast(result, this.lSensor);
+                drawSensor(result, this.lSensor);
+                if(result.hasHit()) {
+                    distances[0] = result.getHitDistance(this.lSensor) / 100;
+                }
+                result.reset();
+                world.raycast(result, this.fSensor);
+                drawSensor(result, this.fSensor);
+                if(result.hasHit()) {
+                    distances[1] = result.getHitDistance(this.fSensor) / 100;
+                }
+                result.reset();
+                world.raycast(result, this.rSensor);
+                drawSensor(result, this.rSensor);
+                if(result.hasHit()) {
+                    distances[2] = result.getHitDistance(this.rSensor) / 100;
+                }
+
+                return distances;
+            };
+
+            Car.prototype.update = function() {
+                this.speeds.push((this.wheels[2].getSpeed() + this.wheels[3].getSpeed()) / 2);
+                while(this.speeds.length > speedAvgWindow) {
+                    this.speeds.shift();
+                }
+
+                var sum = 0;
+                for(var i = 0; i < this.speeds.length; i++) {
+                    sum += this.speeds[i];
+                }
+                this.avgSpeed = sum / this.speeds.length;
+
+                var steerValue = 0.63 * -(this.steer * 2 - 1);
+                var engineForce = 150 * this.throttle;
+                var brakeForce = 150 * this.brake;
+
+                this.wheels[0].steerValue = steerValue;
+                this.wheels[1].steerValue = steerValue;
+
+                this.wheels[2].engineForce = engineForce;
+                this.wheels[3].engineForce = engineForce;
+
+                this.wheels[2].setBrakeForce(brakeForce);
+                this.wheels[3].setBrakeForce(brakeForce);
+
+                var w = this.chassis.box.width * 9 / 10;
+                var h = this.chassis.box.height * 9 / 10;
+                var sensorPositions = [];
+                sensorPositions.push([-w / 2, h / 2]);
+                sensorPositions.push([     0, h / 2]);
+                sensorPositions.push([ w / 2, h / 2]);
+                var d = 100 / Math.sqrt(2);
+                sensorPositions.push([-w / 2 - d, h / 2 + d]);
+                sensorPositions.push([     0    , h / 2 + 100]);
+                sensorPositions.push([ w / 2 + d, h / 2 + d]);
+                for(var i = 0; i < sensorPositions.length; i++) {
+                    p2.vec2.rotate(sensorPositions[i], sensorPositions[i], this.chassis.body.angle);
+                    p2.vec2.add(sensorPositions[i], sensorPositions[i], this.chassis.body.position);
+                }
+
+                this.lSensor.from = sensorPositions[0];
+                this.lSensor.to = sensorPositions[3];
+                this.fSensor.from = sensorPositions[1];
+                this.fSensor.to = sensorPositions[4];
+                this.rSensor.from = sensorPositions[2];
+                this.rSensor.to = sensorPositions[5];
+
+                this.lSensor.update();
+                this.fSensor.update();
+                this.rSensor.update();
+            };
+
+            Car.prototype.draw = function() {
+                ctx.strokeStyle = 'white';
+                var x = this.chassis.body.position[0];
+                var y = this.chassis.body.position[1];
+                var w = this.chassis.box.width;
+                var h = this.chassis.box.height;
+
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(this.chassis.body.angle);
+
+                ctx.translate(-w / 2, -h / 2);
+                ctx.beginPath();
+                ctx.rect(0, 0, w, h);
+                ctx.translate(w / 2, h / 2);
+
+                var wheelWidth = w / 6;
+                var wheelHeight = h / 6;
+                for(var i = 0; i < this.wheels.length; i++) {
+                    var w = this.wheels[i];
+                    var x = w.localPosition[0];
+                    var y = Math.sign(w.localPosition[1]) * (Math.abs(w.localPosition[1]) - wheelHeight);
+
+                    ctx.save();
+                    ctx.translate(x, y);
+                    if(i < 2) {
+                        ctx.rotate(0.63 * -(this.steer * 2 - 1));
+                    }
+                    ctx.translate(-wheelWidth / 2, -wheelHeight / 2);
+
+                    ctx.rect(0, 0, wheelWidth, wheelHeight);
+                    ctx.restore();
+                }
+
+                ctx.stroke();
+                ctx.restore();
+            };
+
+            function buildWall(pt0, pt1) {
+                var wall = new p2.Body({
+                    position: [(pt0[0] + pt1[0]) / 2, (pt0[1] + pt1[1]) / 2],
+                    angle: Math.atan2(pt1[1] - pt0[1], pt1[0] - pt0[0])
+                });
+                wall.addShape(new p2.Box({
+                    width: p2.vec2.dist(pt0, pt1),
+                    height: 5,
+                    collisionGroup: wallGroup
+                }));
+
+                return wall;
+            }
+
+            function buildCheckpoint(pt0, pt1) {
+                var checkpoint = new p2.Body({
+                    position: [(pt0[0] + pt1[0]) / 2, (pt0[1] + pt1[1]) / 2],
+                    angle: Math.atan2(pt1[1] - pt0[1], pt1[0] - pt0[0])
+                });
+                checkpoint.addShape(new p2.Box({
+                    width: p2.vec2.dist(pt0, pt1),
+                    height: 0.5,
+                    sensor: true,
+                    collisionGroup: checkpointGroup
+                }));
+
+                return checkpoint;
+            }
+
+            function buildTrack(trackPoints) {
+                if(trackPoints.length > 1) {
+                    walls = [];
+                    checkpoints = [];
+
+                    var points = trackPoints.slice(0);
+                    var pathWidth = 80;
+
+                    points.push(points[0]);
+                    points.push(points[1]);
+
+                    var innerPoints = [];
+                    var outerPoints = [];
+
+                    var x = points[0][0];
+                    var y = points[0][1];
+                    var x1 = points[1][0];
+                    var y1 = points[1][1];
+                    var prevAngle = Math.atan2(y1 - y, x1 - x);
+                    startingPosition = points[0];
+                    startingAngle = prevAngle - Math.PI / 2;
+
+                    for(var i = 0; i < points.length - 1; i++) {
+                        var x = points[i][0];
+                        var y = points[i][1];
+                        var x1 = points[i + 1][0];
+                        var y1 = points[i + 1][1];
+
+                        var angle = Math.atan2(y1 - y, x1 - x);
+                        var pathAngle = Math.PI + angle - prevAngle;
+
+                        var shift = [Math.cos(pathAngle / 2 + prevAngle), Math.sin(pathAngle / 2 + prevAngle)];
+                        p2.vec2.scale(shift, shift, (pathWidth + 5) / 2 / Math.sin(pathAngle / 2));
+
+                        var inPt = p2.vec2.add([0, 0], points[i], shift);
+                        var outPt = p2.vec2.sub([0, 0], points[i], shift);
+
+                        innerPoints.push(inPt);
+                        outerPoints.push(outPt);
+
+                        if(i === points.length - 2) {
+                            innerPoints[0] = inPt;
+                            outerPoints[0] = outPt;
+                            var checkpoint = buildCheckpoint(inPt, outPt);
+                            checkpoint.number = 0;
+                            checkpoints[0] = checkpoint;
+                        }
+                        else {
+                            var checkpoint = buildCheckpoint(inPt, outPt);
+                            checkpoint.number = checkpoints.length;
+                            checkpoints.push(checkpoint);
+                        }
+
+                        prevAngle = angle;
+                    }
+
+                    for(var i = 0; i < innerPoints.length - 1; i++) {
+                        walls.push(buildWall(innerPoints[i], innerPoints[i + 1]));
+                    }
+                    for(var i = 0; i < outerPoints.length - 1; i++) {
+                        walls.push(buildWall(outerPoints[i], outerPoints[i + 1]));
+                    }
+                }
+
+                var top = new p2.Body({position: [width / 2, 0]});
+                top.addShape(new p2.Box({
+                    width: width,
+                    height: 10,
+                    collisionGroup: wallGroup
+                }));
+                walls.push(top);
+                var bottom = new p2.Body({position: [width / 2, height]});
+                bottom.addShape(new p2.Box({
+                    width: width,
+                    height: 10,
+                    collisionGroup: wallGroup
+                }));
+                walls.push(bottom);
+                var left = new p2.Body({position: [0, height / 2]});
+                left.addShape(new p2.Box({
+                    width: 10,
+                    height: height,
+                    collisionGroup: wallGroup
+                }));
+                walls.push(left);
+                var right = new p2.Body({position: [width, height / 2]});
+                right.addShape(new p2.Box({
+                    width: 10,
+                    height: height,
+                    collisionGroup: wallGroup
+                }));
+                walls.push(right);
+            }
+
+            function addTrack() {
+                for(var i = 0; i < walls.length; i++) {
+                    world.addBody(walls[i]);
+                }
+                for(var i = 0; i < checkpoints.length; i++) {
+                    world.addBody(checkpoints[i]);
+                }
+            }
+
+            function drawWall(wall) {
+                ctx.strokeStyle = 'white';
+                ctx.beginPath();
+                ctx.save();
+                ctx.translate(wall.position[0], wall.position[1]);
+                ctx.rotate(wall.angle);
+                ctx.clearRect(-wall.shapes[0].width / 2, -wall.shapes[0].height / 2, wall.shapes[0].width, wall.shapes[0].height);
+                ctx.rect(-wall.shapes[0].width / 2, -wall.shapes[0].height / 2, wall.shapes[0].width, wall.shapes[0].height);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            function drawSensor(result, ray) {
+                ctx.strokeStyle = '#ff5050';
+                ctx.beginPath();
+                ctx.moveTo(ray.from[0], ray.from[1]);
+                ctx.lineTo(ray.to[0], ray.to[1]);
+                ctx.stroke();
+
+                var hitPoint = p2.vec2.create();
+                result.getHitPoint(hitPoint, ray);
+
+                if(result.hasHit()) {
+                    ctx.beginPath();
+                    ctx.arc(hitPoint[0], hitPoint[1], 5, 0, 2 * Math.PI);
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(hitPoint[0], hitPoint[1]);
+                ctx.lineTo(hitPoint[0] + result.normal[0] * 10, hitPoint[1] + result.normal[1] * 10);
+                ctx.stroke();
+            }
+
+            function drawCheckpoint(checkpoint) {
+                ctx.beginPath();
+                ctx.save();
+                ctx.translate(checkpoint.position[0], checkpoint.position[1]);
+                ctx.rotate(checkpoint.angle);
+                ctx.rect(-checkpoint.shapes[0].width / 2, -checkpoint.shapes[0].height / 2, checkpoint.shapes[0].width, checkpoint.shapes[0].height);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            function drawCross(pt) {
+                ctx.strokeStyle = '#ff5050';
+                ctx.beginPath();
+                ctx.save();
+                ctx.translate(pt[0], pt[1]);
+                ctx.moveTo(-4, -4);
+                ctx.lineTo(4, 4);
+                ctx.moveTo(-4, 4);
+                ctx.lineTo(4, -4);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            function drawFitness(individual) {
+                fitnessCtx.clearRect(0, 0, statWidth, statHeight);
+
+                fitnessCtx.fillStyle = 'white';
+                fitnessCtx.fillRect(Math.min(statWidth / 2, individual.car.steer * statWidth), 0, Math.abs(individual.car.steer - 0.5) * statWidth, statHeight / 10);
+                fitnessCtx.fillRect(statWidth / 9, statHeight / 10, statWidth / 3, individual.car.throttle * statHeight * 9 / 10);
+                fitnessCtx.fillStyle = '#ff5050';
+                fitnessCtx.fillRect(statWidth * 5 / 9, statHeight / 10, statWidth / 3, individual.car.brake * statHeight * 9 / 10);
+
+                fitnessCtx.strokeStyle = 'aqua';
+                fitnessCtx.beginPath();
+                var max = 0;
+                for(var i = 0; i < fitnessData.length; i++) {
+                    max = Math.max(max, fitnessData[i].speed);
+                }
+                fitnessCtx.moveTo(0, fitnessData[0].speed / max * statHeight);
+                for(var i = 1; i < fitnessData.length; i++) {
+                    fitnessCtx.lineTo(i / fitnessData.length * statWidth, fitnessData[i].speed / max * statHeight);
+                }
+                fitnessCtx.stroke();
+
+                fitnessCtx.strokeStyle = 'aquamarine';
+                fitnessCtx.beginPath();
+                max = bestFitness;
+                for(var i = 0; i < fitnessData.length; i++) {
+                    max = Math.max(max, fitnessData[i].fitness);
+                }
+                max *= 1.1;
+                fitnessCtx.moveTo(0, fitnessData[0].fitness / max * statHeight);
+                for(var i = 1; i < fitnessData.length; i++) {
+                    fitnessCtx.lineTo(i / fitnessData.length * statWidth, fitnessData[i].fitness / max * statHeight);
+                }
+                fitnessCtx.stroke();
+
+                fitnessCtx.strokeStyle = '#ff5050';
+                fitnessCtx.beginPath();
+                fitnessCtx.moveTo(0, bestFitness / max * statHeight);
+                fitnessCtx.lineTo(statWidth, bestFitness / max * statHeight);
+                fitnessCtx.stroke();
+            }
+
+            function drawNetWeights(individual) {
+                netCtx.clearRect(0, 0, statWidth, statHeight);
+
+                for(var i = 0; i < numInputNodes; i++) {
+                    var p = (i + 0.5) / numInputNodes;
+                    for(var j = 0; j < numHiddenNodes; j++) {
+                        var pn = (j + 0.5) / numHiddenNodes;
+                        var w = individual.inputLayerWeights[i * numHiddenNodes + j];
+                        netCtx.strokeStyle = netWeightColor(w);
+                        netCtx.beginPath();
+                        netCtx.moveTo(30, p * statHeight);
+                        netCtx.lineTo(statWidth / 2, pn * statHeight);
+                        netCtx.stroke();
+                    }
+                }
+                for(var i = 0; i < numHiddenNodes; i++) {
+                    var p = (i + 0.5) / numHiddenNodes;
+                    for(var j = 0; j < numOutputNodes; j++) {
+                        var pn = (j + 0.5) / numOutputNodes;
+                        var w = individual.hiddenLayerWeights[i * numOutputNodes + j];
+                        netCtx.strokeStyle = netWeightColor(w);
+                        netCtx.beginPath();
+                        netCtx.moveTo(statWidth / 2, p * statHeight);
+                        netCtx.lineTo(statWidth - 30, pn * statHeight);
+                        netCtx.stroke();
+                    }
+                }
+            }
+
+            function drawNetNodes(input, hidden, output) {
+                for(var i = 0; i < input.length; i++) {
+                    var p = (i + 0.5) / input.length;
+                    var w = input[i];
+                    netCtx.fillStyle = netNodeColor(w);
+                    netCtx.beginPath();
+                    netCtx.arc(30, p * statHeight, 5, 0, 2 * Math.PI);
+                    netCtx.fill();
+                }
+                for(var i = 0; i < hidden.length; i++) {
+                    var p = (i + 0.5) / hidden.length;
+                    var w = hidden[i];
+                    netCtx.fillStyle = netNodeColor(w);
+                    netCtx.beginPath();
+                    netCtx.arc(statWidth / 2, p * statHeight, 5, 0, 2 * Math.PI);
+                    netCtx.fill();
+                }
+                for(var i = 0; i < output.length; i++) {
+                    var p = (i + 0.5) / output.length;
+                    var w = output[i];
+                    netCtx.fillStyle = netNodeColor(w);
+                    netCtx.beginPath();
+                    netCtx.arc(statWidth - 30, p * statHeight, 5, 0, 2 * Math.PI);
+                    netCtx.fill();
+                }
+            }
+
+            function makeNewPopulation() {
+                trails = [];
+                genome = 0;
+                if(generation == 0) {
+                    data = [];
+                    for(var i = 0; i < 20; i++) {
+                        data.push(new Individual());
+                    }
+                    // data[0].loadWeights([-0.7733835869223846, 0.6912134550870966, 0.5200670862577853, 0.010066281266006852, -0.5835689638660787, 0.8593150302810204, 0.26383433483466945, 0.9188772623254501, 0.31082387838616016, -0.9230020957835063, -0.7608622651918358, 0.30120385825322604, -0.14702176464584205, 0.7945683676145202, 0.007116911217986167], [0.9611058622695274, 0.4453658472827804, 0.5119108361151719, 0.3207568399123908, -0.4422832359833526, -0.7372888053877926, -0.1949370821845664, 0.874614217636968, -0.7331837892749098, 0.9683396872537071, 0.16838989173208696, 0.19111659656828306, -0.2644370555293081, -0.07536544694538527, 0.6761137178251246]);
+                }
+                else {
+                    var datalen = data.length;
+                    data = data.sort(function(a, b) {
+                        return b.fitness() - a.fitness();
+                    });
+
+                    var breeders = data.slice(0, Math.max(2, ~~(datalen * 0.15)));
+                    data = [breeders[0]];
+                    for(var i = data.length; i < datalen - 1; i++) {
+                        breeders = shuffle(breeders);
+                        data.push(new Individual(breeders[0], breeders[1]));
+                    }
+                    data.push(new Individual());
+                }
+            }
+
+            function tick(time) {
+                world.step(1 / 60);
+                ctx.clearRect(0, 0, width, height);
+
+                for(var i = 0; i < walls.length; i++) {
+                    drawWall(walls[i]);
+                }
+                for(var i = 0; i < checkpoints.length; i++) {
+                    ctx.strokeStyle = 'rgba(255, 80, 80, 0.3)';
+                    if(currentIndividual && currentIndividual.checkpoint.number >= i) {
+                        ctx.strokeStyle = '#ff5050';
+                    }
+                    drawCheckpoint(checkpoints[i]);
+                }
+
+                for(var i = 0; i < trails.length; i++) {
+                    ctx.strokeStyle = i === trails.length - 1 ? 'aquamarine' : 'rgba(255, 255, 255, 0.15)';
+                    ctx.beginPath();
+                    ctx.moveTo(trails[i][0][0], trails[i][0][1]);
+                    for(var j = 1; j < trails[i].length; j++) {
+                        ctx.lineTo(trails[i][j][0], trails[i][j][1]);
+                    }
+                    ctx.stroke();
+                    if(i !== genome) {
+                        drawCross(trails[i][trails[i].length - 1]);
+                    }
+                }
+
+                if(currentIndividual) {
+                    currentIndividual.update();
+                    currentIndividual.car.draw();
+                    drawFitness(currentIndividual);
+
+                    if(currentIndividual.finished) {
+                        genome++;
+                        if(genome >= data.length) {
+                            generation++;
+                            makeNewPopulation();
+                        }
+
+                        currentIndividual = data[genome];
+                        currentIndividual.setSimulation();
+                        document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
+                    }
+                }
+
+                tickId = requestAnimFrame(tick);
+            }
+
+            function start() {
+                if(!tickId) {
+                    data[0].setSimulation();
+                    document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
+                    tick();
+                }
+            }
+
+            function kill() {
+                if(currentIndividual) {
+                    bestFitness = Math.max(bestFitness, currentIndividual.fitness());
+                    currentIndividual.finished = true;
+                }
+            }
+
+            function reset() {
+                buildTrack(track);
+
+                cancelAnimFrame(tickId);
+                tickId = false;
+
+                ctx.clearRect(0, 0, width, height);
+                netCtx.clearRect(0, 0, statWidth, statHeight);
+                fitnessCtx.clearRect(0, 0, statWidth, statHeight);
+
+                for(var i = 0; i < walls.length; i++) {
+                    drawWall(walls[i]);
+                }
+                ctx.strokeStyle = 'rgba(255, 80, 80, 0.3)';
+                for(var i = 0; i < checkpoints.length; i++) {
+                    drawCheckpoint(checkpoints[i]);
+                }
+
+                currentIndividual = undefined;
+                bestFitness = 0;
+                generation = 0;
+                genome = 0;
+                makeNewPopulation();
+                document.querySelector('#genetic').innerHTML = 'Generation: ' + generation + ', Genome: ' + genome + '<br>Best Fitness: ' + bestFitness.toFixed(2);
+                document.querySelector('#individual').innerHTML = 'Fitness: 0.00, Avg. Speed: 0.00';
+            }
+
+            reset();
+        </script>
+    </body>
 </html>
