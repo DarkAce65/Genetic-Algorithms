@@ -173,7 +173,7 @@
                     if(body.number === 0 && number === checkpoints.length - 1) {
                         number = 0;
                     }
-                    currentIndividual.prevFitness += currentIndividual.checkpoint.progress * currentIndividual.checkpoint.distToNext;
+                    currentIndividual.prevFitness = currentIndividual.fitness();
                     currentIndividual.checkpoint.progress = 0;
                     currentIndividual.checkpoint.number = number;
                     currentIndividual.checkpoint.distToNext = currentIndividual.distToCheckpoint(number + 1);
