@@ -286,7 +286,6 @@
             Individual.prototype.update = function() {
                 this.car.update();
                 fitnessData.push({
-                    fitness: this.fitness(),
                     speed: this.car.avgSpeed
                 });
 
@@ -720,25 +719,6 @@
                 for(var i = 1; i < fitnessData.length; i++) {
                     fitnessCtx.lineTo(i / fitnessData.length * statWidth, fitnessData[i].speed / max * statHeight);
                 }
-                fitnessCtx.stroke();
-
-                fitnessCtx.strokeStyle = 'aquamarine';
-                fitnessCtx.beginPath();
-                max = bestFitness;
-                for(var i = 0; i < fitnessData.length; i++) {
-                    max = Math.max(max, fitnessData[i].fitness);
-                }
-                max *= 1.1;
-                fitnessCtx.moveTo(0, fitnessData[0].fitness / max * statHeight);
-                for(var i = 1; i < fitnessData.length; i++) {
-                    fitnessCtx.lineTo(i / fitnessData.length * statWidth, fitnessData[i].fitness / max * statHeight);
-                }
-                fitnessCtx.stroke();
-
-                fitnessCtx.strokeStyle = '#ff5050';
-                fitnessCtx.beginPath();
-                fitnessCtx.moveTo(0, bestFitness / max * statHeight);
-                fitnessCtx.lineTo(statWidth, bestFitness / max * statHeight);
                 fitnessCtx.stroke();
             }
 
