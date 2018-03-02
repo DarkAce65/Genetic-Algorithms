@@ -198,7 +198,7 @@
             var checkpointGroup = 0b100;
             var walls = [];
             var checkpoints = [];
-            var track = [[130, 110], [150, 320], [90, 420], [110, 520], [400, 540], [650, 500], [700, 420], [660, 360], [560, 360], [400, 400], [320, 360], [340, 280], [450, 200], [660, 245], [685, 120], [600, 65], [305, 75]];
+            var track = [[130, 110], [150, 320], [90, 420], [110, 520], [400, 540], [650, 500], [700, 420], [660, 360], [560, 360], [400, 400], [320, 360], [300, 240], [450, 200], [620, 240], [700, 180], [685, 120], [600, 65], [305, 75]];
             var startingPosition = [width / 2, height / 2];
             var startingAngle = 0;
 
@@ -490,6 +490,8 @@
                 ctx.rotate(this.chassis.body.angle);
 
                 ctx.translate(-w / 2, -h / 2);
+                ctx.fillStyle = 'rgba(18, 18, 18, 0.8)';
+                ctx.fillRect(0, 0, w, h);
                 ctx.beginPath();
                 ctx.rect(0, 0, w, h);
                 ctx.translate(w / 2, h / 2);
