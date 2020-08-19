@@ -140,6 +140,11 @@
             var mutationAmount = 0.1;
             var speedAvgWindow = 50;
 
+            var sensorDist = 120;
+            var sensorAngle = 35 * Math.PI / 180;
+            var sensorCos = sensorDist * Math.cos(sensorAngle);
+            var sensorSin = sensorDist * Math.sin(sensorAngle);
+
             var data = [];
             var trails = [];
             var fitnessData = [];
@@ -292,8 +297,8 @@
                 }
 
                 var inputLayer = this.car.getDistances();
-                var hiddenLayer = [0, 0, 0, 0, 0];
-                var outputLayer = [0, 0, 0];
+                var hiddenLayer = Array(numHiddenNodes).fill(0);
+                var outputLayer = Array(numOutputNodes).fill(0);
 
                 for (var i = 0; i < numHiddenNodes; i++) {
                     for (var j = 0; j < numInputNodes; j++) {
@@ -404,19 +409,19 @@
                 world.raycast(result, this.lSensor);
                 drawSensor(result, this.lSensor);
                 if (result.hasHit()) {
-                    distances[0] = result.getHitDistance(this.lSensor) / 100;
+                    distances[0] = result.getHitDistance(this.lSensor) / sensorDist;
                 }
                 result.reset();
                 world.raycast(result, this.fSensor);
                 drawSensor(result, this.fSensor);
                 if (result.hasHit()) {
-                    distances[1] = result.getHitDistance(this.fSensor) / 100;
+                    distances[1] = result.getHitDistance(this.fSensor) / sensorDist;
                 }
                 result.reset();
                 world.raycast(result, this.rSensor);
                 drawSensor(result, this.rSensor);
                 if (result.hasHit()) {
-                    distances[2] = result.getHitDistance(this.rSensor) / 100;
+                    distances[2] = result.getHitDistance(this.rSensor) / sensorDist;
                 }
 
                 return distances;
@@ -453,10 +458,9 @@
                 sensorPositions.push([-w / 2, h / 2]);
                 sensorPositions.push([     0, h / 2]);
                 sensorPositions.push([ w / 2, h / 2]);
-                var d = 100 / Math.sqrt(2);
-                sensorPositions.push([-w / 2 - d, h / 2 + d]);
-                sensorPositions.push([     0    , h / 2 + 100]);
-                sensorPositions.push([ w / 2 + d, h / 2 + d]);
+                sensorPositions.push([-w / 2 - sensorCos, h / 2 + sensorSin]);
+                sensorPositions.push([     0    , h / 2 + sensorDist]);
+                sensorPositions.push([ w / 2 + sensorCos, h / 2 + sensorSin]);
                 for (var i = 0; i < sensorPositions.length; i++) {
                     p2.vec2.rotate(sensorPositions[i], sensorPositions[i], this.chassis.body.angle);
                     p2.vec2.add(sensorPositions[i], sensorPositions[i], this.chassis.body.position);
