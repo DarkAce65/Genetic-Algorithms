@@ -3,7 +3,7 @@ const prettierConfig = require('./prettier.config');
 module.exports = {
   parser: 'babel-eslint',
   plugins: ['prettier', 'import'],
-  extends: ['eslint:recommended', 'prettier', 'plugin:prettier/recommended'],
+  extends: ['eslint:recommended', 'prettier'],
   env: { browser: true, node: true, es6: true },
   parserOptions: { ecmaVersion: 6 },
   rules: {
@@ -36,4 +36,17 @@ module.exports = {
       },
     ],
   },
+  overrides: [
+    {
+      files: ['*.ts', '*.tsx'],
+      parser: '@typescript-eslint/parser',
+      plugins: ['@typescript-eslint', 'prettier', 'import'],
+      extends: [
+        'eslint:recommended',
+        'plugin:@typescript-eslint/recommended',
+        'prettier/@typescript-eslint',
+      ],
+      parserOptions: { ecmaVersion: 6, sourceType: 'module' },
+    },
+  ],
 };

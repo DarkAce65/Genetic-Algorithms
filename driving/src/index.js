@@ -3,23 +3,7 @@ import './style.scss';
 import chroma from 'chroma-js';
 import p2 from 'p2';
 
-function shuffle(array) {
-  // Fisher–Yates Shuffle
-  let m = array.length;
-  let t;
-  let i;
-  while (m) {
-    i = Math.floor(Math.random() * m--);
-    t = array[m];
-    array[m] = array[i];
-    array[i] = t;
-  }
-  return array;
-}
-
-function squaredSum(acc, value) {
-  return acc + value * value;
-}
+import { shuffle, squaredSum } from './utils';
 
 let tickId = false;
 const numInputNodes = 3;
@@ -505,10 +489,10 @@ function buildTrack(trackPoints) {
     }
 
     for (let i = 0; i < points.length - 1; i++) {
-      const [x0, y0] = points[i];
-      const [x1, y1] = points[i + 1];
+      const [px0, py0] = points[i];
+      const [px1, py1] = points[i + 1];
 
-      const angle = Math.atan2(y1 - y0, x1 - x0);
+      const angle = Math.atan2(py1 - py0, px1 - px0);
       const pathAngle = Math.PI + angle - prevAngle;
 
       const shift = [Math.cos(pathAngle / 2 + prevAngle), Math.sin(pathAngle / 2 + prevAngle)];
