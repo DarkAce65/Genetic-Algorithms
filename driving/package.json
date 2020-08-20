@@ -1,5 +1,7 @@
 {
   "scripts": {
+    "eslint:fix": "eslint --fix \"*.config.js\" \"src/**/*.js\"",
+    "prettier:write": "prettier --write \".eslintrc.js\" \"*.config.js\" \"src/**/*.{js,scss}\"",
     "dev": "webpack-dev-server",
     "build": "webpack"
   },
