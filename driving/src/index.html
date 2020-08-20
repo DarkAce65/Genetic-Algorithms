@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Driving Simulation</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <div class="container">
+      <div id="stats">
+        <canvas id="net"></canvas>
+        <div style="display: inline-block;">
+          <div id="genetic">Generation: 0, Genome: 0<br />Best Fitness: 0.00</div>
+          <div id="individual">Fitness: 0.00, Avg. Speed: 0.00</div>
+          <br />
+          <div>
+            <button onclick="start();">Start</button>
+            <button onclick="kill();">Kill Current Simulation</button>
+            <button onclick="reset();">Reset</button>
+          </div>
+        </div>
+        <canvas id="fitness"></canvas>
+      </div>
+      <canvas id="canvas"></canvas>
+    </div>
+  </body>
+</html>
