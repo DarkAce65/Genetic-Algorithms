@@ -2,27 +2,27 @@ import chroma from 'chroma-js';
 
 import { clamp, squaredSum } from './utils';
 
-type IndividualOptions = {
+type NetworkOptions = {
   numInputs: number;
   numHiddenNodes: number;
   numOutputs: number;
   mutationChance: number;
   mutationAmount: number;
 
-  parents?: [Individual, Individual];
+  parents?: [Network, Network];
 };
 
 type NetworkStructure = { numInputs: number; numHiddenNodes: number; numOutputs: number };
 
 const networkColorScale = chroma.scale(['aquamarine', '#222222', 'white']).domain([-1, 1]);
 
-class Individual {
-  private networkStructure: NetworkStructure;
+class Network {
+  private readonly networkStructure: NetworkStructure;
 
   private inputLayerWeights: number[] = [];
   private hiddenLayerWeights: number[] = [];
 
-  private weightsSquared: number;
+  private readonly weightsSquared: number;
 
   constructor({
     numInputs,
@@ -32,7 +32,7 @@ class Individual {
     mutationAmount = 0.1,
 
     parents,
-  }: IndividualOptions) {
+  }: NetworkOptions) {
     if (parents) {
       const [p0, p1] = parents;
 
@@ -72,9 +72,7 @@ class Individual {
       }
     }
 
-    this.weightsSquared =
-      (squaredSum(this.inputLayerWeights) + squaredSum(this.hiddenLayerWeights)) /
-      (numInputs + numHiddenNodes);
+    this.weightsSquared = squaredSum(this.inputLayerWeights) + squaredSum(this.hiddenLayerWeights);
 
     this.networkStructure = { numInputs, numHiddenNodes, numOutputs };
   }
@@ -188,4 +186,4 @@ class Individual {
   }
 }
 
-export default Individual;
+export default Network;
