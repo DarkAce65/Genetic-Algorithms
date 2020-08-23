@@ -1,8 +1,10 @@
 import p2, { Body, Box } from 'p2';
 
 import {
+  CAR_MASK,
   CHECKPOINT_MASK,
   DEFAULT_TRACK_WIDTH,
+  SENSOR_MASK,
   Vector2,
   WALL_MASK,
   WALL_THICKNESS,
@@ -34,6 +36,7 @@ const constructWall = (point0: Vector2, point1: Vector2): Body => {
       width: p2.vec2.dist(point0, point1),
       height: WALL_THICKNESS,
       collisionGroup: WALL_MASK,
+      collisionMask: CAR_MASK | SENSOR_MASK,
     })
   );
 
@@ -54,6 +57,7 @@ const constructCheckpoint = (point0: Vector2, point1: Vector2): Body => {
       height: 0.5,
       sensor: true,
       collisionGroup: CHECKPOINT_MASK,
+      collisionMask: CAR_MASK,
     })
   );
 

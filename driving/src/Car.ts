@@ -1,6 +1,6 @@
 import p2, { Body, Box, Ray, RaycastResult, TopDownVehicle, WheelConstraint, World } from 'p2';
 
-import { CHECKPOINT_MASK, Vector2, WALL_MASK } from './constants';
+import { CAR_MASK, CHECKPOINT_MASK, SENSOR_MASK, Vector2, WALL_MASK } from './constants';
 
 type SensorOptions = { numSensors?: number; sensorLength?: number; sensorAngle?: number };
 type Sensor = {
@@ -15,11 +15,11 @@ type Sensor = {
 };
 
 class Car {
-  private chassis: { body: Body; box: Box };
-  private tdv: TopDownVehicle;
-  private wheels: [WheelConstraint, WheelConstraint, WheelConstraint, WheelConstraint];
+  readonly chassis: { body: Body; box: Box };
+  readonly tdv: TopDownVehicle;
+  private readonly wheels: [WheelConstraint, WheelConstraint, WheelConstraint, WheelConstraint];
 
-  private sensors: Sensor[] = [];
+  private readonly sensors: Sensor[] = [];
 
   constructor(
     bodyWidth: number,
@@ -30,6 +30,7 @@ class Car {
     const chassisBox = new Box({
       width: bodyWidth,
       height: bodyHeight,
+      collisionGroup: CAR_MASK,
       collisionMask: WALL_MASK | CHECKPOINT_MASK,
     });
     chassisBody.addShape(chassisBox);
@@ -64,9 +65,10 @@ class Car {
         localTo,
         ray: new Ray({
           mode: Ray.CLOSEST,
-          collisionMask: WALL_MASK,
           from: localFrom,
           to: localTo,
+          collisionGroup: SENSOR_MASK,
+          collisionMask: WALL_MASK,
         }),
         hasHit: false,
       };
@@ -76,6 +78,12 @@ class Car {
     this.tdv = vehicle;
     this.chassis = { body: chassisBody, box: chassisBox };
     this.wheels = [flWheel, frWheel, blWheel, brWheel];
+  }
+
+  getNormalizedSensorValues(): number[] {
+    return this.sensors.map((sensor) =>
+      sensor.hasHit ? sensor.hitDistance / sensor.ray.length : 1
+    );
   }
 
   getSpeed(): number {
