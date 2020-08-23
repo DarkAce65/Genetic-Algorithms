@@ -1,11 +1,17 @@
 import p2, { Body, Box } from 'p2';
 
-import { CHECKPOINT_MASK, Vector2, WALL_MASK, WALL_THICKNESS } from './constants';
+import {
+  CHECKPOINT_MASK,
+  DEFAULT_TRACK_WIDTH,
+  Vector2,
+  WALL_MASK,
+  WALL_THICKNESS,
+} from './constants';
 
 type Checkpoint = { number: number; cumulativeDistance: number; body: Body };
 
 type TrackPoint = { position: Vector2; width?: number };
-type TrackDefinition = { points: TrackPoint[]; defaultWidth: number };
+type TrackDefinition = TrackPoint[];
 export type Track = {
   walls: Body[];
   checkpoints: Checkpoint[];
@@ -57,9 +63,9 @@ const constructCheckpoint = (point0: Vector2, point1: Vector2): Body => {
 const wrappedModulo = (value: number, modulus: number): number =>
   ((value % modulus) + modulus) % modulus;
 
-export const buildTrack = (track: TrackDefinition): Track => {
-  if (track.points.length < 3) {
-    throw new Error('Invalid track configuration');
+export const buildTrack = (trackPoints: TrackDefinition): Track => {
+  if (trackPoints.length < 3) {
+    throw new Error('Invalid track configuration - track requires at least 3 points');
   }
 
   const walls = [];
@@ -67,17 +73,18 @@ export const buildTrack = (track: TrackDefinition): Track => {
   const leftPoints = [];
   const rightPoints = [];
 
-  const { points, defaultWidth } = track;
-  const initialPosition = points[0].position;
+  const initialPosition = trackPoints[0].position;
   let initialAngle = 0;
 
-  for (let i = 0; i < points.length; i++) {
-    const [pt0x, pt0y] = points[wrappedModulo(i - 1, points.length)].position;
+  for (let i = 0; i < trackPoints.length; i++) {
+    const [pt0x, pt0y] = trackPoints[wrappedModulo(i - 1, trackPoints.length)].position;
     const {
       position: [pt1x, pt1y],
       width,
-    } = points[i];
-    const [pt2x, pt2y] = points[(i + 1) % points.length].position;
+    } = trackPoints[i];
+    const [pt2x, pt2y] = trackPoints[(i + 1) % trackPoints.length].position;
+
+    const trackWidth = ((width ?? DEFAULT_TRACK_WIDTH) + WALL_THICKNESS) / 2;
 
     const previousAngle = Math.atan2(pt0y - pt1y, pt0x - pt1x);
     const nextAngle = Math.atan2(pt2y - pt1y, pt2x - pt1x);
@@ -87,26 +94,27 @@ export const buildTrack = (track: TrackDefinition): Track => {
 
     const angle = (previousAngle + nextAngle) / 2;
     const shift = p2.vec2.fromValues(Math.cos(angle), Math.sin(angle));
-    const pathWidth =
-      ((width ?? defaultWidth) + WALL_THICKNESS) / 2 / Math.sin((previousAngle - nextAngle) / 2);
-    p2.vec2.scale(shift, shift, pathWidth);
+    p2.vec2.scale(shift, shift, trackWidth / Math.sin((previousAngle - nextAngle) / 2));
     leftPoints.push(p2.vec2.add(p2.vec2.create(), [pt1x, pt1y], shift));
     rightPoints.push(p2.vec2.sub(p2.vec2.create(), [pt1x, pt1y], shift));
   }
 
   let totalTrackLength = 0;
-  for (let i = 0; i < points.length; i++) {
-    totalTrackLength += p2.vec2.dist(points[i].position, points[(i + 1) % points.length].position);
+  for (let i = 0; i < trackPoints.length; i++) {
+    totalTrackLength += p2.vec2.dist(
+      trackPoints[i].position,
+      trackPoints[(i + 1) % trackPoints.length].position
+    );
 
-    walls.push(constructWall(leftPoints[i], leftPoints[(i + 1) % points.length]));
-    walls.push(constructWall(rightPoints[i], rightPoints[(i + 1) % points.length]));
+    walls.push(constructWall(leftPoints[i], leftPoints[(i + 1) % trackPoints.length]));
+    walls.push(constructWall(rightPoints[i], rightPoints[(i + 1) % trackPoints.length]));
 
     const checkpoint = {
       number: i,
       cumulativeDistance: totalTrackLength,
       body: constructCheckpoint(
-        leftPoints[(i + 1) % points.length],
-        rightPoints[(i + 1) % points.length]
+        leftPoints[(i + 1) % trackPoints.length],
+        rightPoints[(i + 1) % trackPoints.length]
       ),
     };
     checkpoints.push(checkpoint);
