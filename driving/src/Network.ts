@@ -1,5 +1,6 @@
 import chroma from 'chroma-js';
 
+import { CanvasParams } from './constants';
 import { clamp, squaredSum } from './utils';
 
 type NetworkOptions = {
@@ -82,17 +83,12 @@ class Network {
     this.hiddenLayerWeights = hidden;
   }
 
-  evaluateAndDraw(
-    inputs: number[],
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number
-  ): number[] {
+  evaluateAndDraw(inputs: number[], canvasParams: CanvasParams): number[] {
     const [hiddenLayer, outputs] = this.evaluate(inputs);
 
-    ctx.clearRect(0, 0, width, height);
-    this.drawNetWeights(ctx, width, height);
-    this.drawNetNodes(ctx, width, height, inputs, hiddenLayer, outputs);
+    canvasParams.ctx.clearRect(0, 0, canvasParams.width, canvasParams.height);
+    this.drawNetWeights(canvasParams);
+    this.drawNetNodes(canvasParams, inputs, hiddenLayer, outputs);
 
     return outputs;
   }
@@ -119,7 +115,7 @@ class Network {
     return [hiddenLayer, outputs];
   }
 
-  private drawNetWeights(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  private drawNetWeights({ ctx, width, height }: CanvasParams): void {
     const { numInputs, numHiddenNodes, numOutputs } = this.networkStructure;
 
     for (let i = 0; i < numInputs; i++) {
@@ -150,9 +146,7 @@ class Network {
   }
 
   private drawNetNodes(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
+    { ctx, width, height }: CanvasParams,
     input: number[],
     hidden: number[],
     output: number[]
