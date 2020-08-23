@@ -120,7 +120,7 @@ class Car {
       sensor.hasHit = result.hasHit();
       if (sensor.hasHit) {
         const hitPoint = p2.vec2.create();
-        result.getHitPoint(hitPoint, sensor.ray)
+        result.getHitPoint(hitPoint, sensor.ray);
 
         sensor.hitDistance = result.getHitDistance(sensor.ray);
         sensor.hitPoint = hitPoint;
