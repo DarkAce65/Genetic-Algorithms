@@ -160,6 +160,19 @@ class Car {
   draw(ctx: CanvasRenderingContext2D, steer: number): void {
     this.drawSensors(ctx);
 
+    const [x, y] = this.chassis.body.position;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(this.chassis.body.angle);
+    this.drawCar(ctx, steer);
+    ctx.restore();
+  }
+
+  private drawCar(ctx: CanvasRenderingContext2D, steer: number): void {
+    const w = this.chassis.box.width;
+    const h = this.chassis.box.height;
+
     if (Math.abs(this.avgSpeed) > MINIMUM_AVERAGE_SPEED) {
       ctx.strokeStyle = 'white';
       ctx.fillStyle = 'rgba(18, 18, 18, 0.8)';
@@ -167,14 +180,6 @@ class Car {
       ctx.strokeStyle = 'gray';
       ctx.fillStyle = 'rgba(18, 18, 18, 0.8)';
     }
-
-    const [x, y] = this.chassis.body.position;
-    const w = this.chassis.box.width;
-    const h = this.chassis.box.height;
-
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(this.chassis.body.angle);
 
     ctx.translate(-w / 2, -h / 2);
     ctx.fillRect(0, 0, w, h);
@@ -202,7 +207,6 @@ class Car {
     }
 
     ctx.stroke();
-    ctx.restore();
   }
 
   private drawSensors(ctx: CanvasRenderingContext2D) {
