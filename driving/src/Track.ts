@@ -13,7 +13,7 @@ import { wrappedModulo } from './utils';
 
 export interface Checkpoint extends Body {
   index: number;
-  trackLength: number;
+  trackSegmentLength: number;
   cumulativeDistance: number;
   lastCheckpoint: boolean;
 }
@@ -106,11 +106,11 @@ class Track {
 
     this.totalTrackLength = 0;
     for (let i = 0; i < trackPoints.length; i++) {
-      const trackLength = p2.vec2.dist(
+      const trackSegmentLength = p2.vec2.dist(
         trackPoints[i].position,
         trackPoints[(i + 1) % trackPoints.length].position
       );
-      this.totalTrackLength += trackLength;
+      this.totalTrackLength += trackSegmentLength;
 
       this.walls.push(constructWall(leftPoints[i], leftPoints[(i + 1) % trackPoints.length]));
       this.walls.push(constructWall(rightPoints[i], rightPoints[(i + 1) % trackPoints.length]));
@@ -122,7 +122,7 @@ class Track {
         ),
         {
           index: i,
-          trackLength,
+          trackSegmentLength,
           cumulativeDistance: this.totalTrackLength,
           lastCheckpoint: i === trackPoints.length - 1,
         }

@@ -77,6 +77,10 @@ class Simulation {
     this.finishCallback(this.simulationData.bestFitness);
   }
 
+  getCarTrail(): Vector2[] {
+    return this.simulationData.datapoints.map((datapoint) => datapoint.position);
+  }
+
   private collisionHandler(event: World['beginContactEvent']) {
     if (event.shapeA.collisionGroup === CHECKPOINT_MASK) {
       this.hitCheckpoint(event.bodyA as Checkpoint);
@@ -99,31 +103,37 @@ class Simulation {
   }
 
   private fitness(): number {
-    return (
-      this.laps * this.track.totalTrackLength +
-      (this.checkpoint === 0 ? 0 : this.track.checkpoints[this.checkpoint - 1].cumulativeDistance) +
-      this.distFromLastCheckpoint()
-    );
-  }
+    const {
+      position: prevCheckpointPosition,
+      cumulativeDistance: prevCheckpointDistance,
+    } = this.track.checkpoints[wrappedModulo(this.checkpoint - 1, this.track.checkpoints.length)];
+    const {
+      position: nextCheckpointPosition,
+      trackSegmentLength: nextCheckpointSegmentLength,
+    } = this.track.checkpoints[this.checkpoint];
 
-  private distFromLastCheckpoint(): number {
-    const [pt0x, pt0y] = this.track.checkpoints[
-      wrappedModulo(this.checkpoint - 1, this.track.checkpoints.length)
-    ].position;
+    const [pt0x, pt0y] = prevCheckpointPosition;
     const [pt1x, pt1y] = this.car.position;
-    const [pt2x, pt2y] = this.track.checkpoints[this.checkpoint].position;
+    const [pt2x, pt2y] = nextCheckpointPosition;
 
     const t =
       ((pt1x - pt0x) * (pt2x - pt0x) + (pt1y - pt0y) * (pt2y - pt0y)) /
       (Math.pow(pt2x - pt0x, 2) + Math.pow(pt2y - pt0y, 2));
 
-    return t * this.track.checkpoints[this.checkpoint].trackLength;
+    const distFromLastCheckpoint = t * nextCheckpointSegmentLength;
+
+    return (
+      this.laps * this.track.totalTrackLength +
+      (this.checkpoint === 0 ? 0 : prevCheckpointDistance) +
+      distFromLastCheckpoint
+    );
   }
 
   tick(
     { ctx, width, height }: CanvasParams,
     netCanvasParams: CanvasParams,
-    fitnessCanvasParams: CanvasParams
+    fitnessCanvasParams: CanvasParams,
+    trails: Vector2[][]
   ): void {
     if (!this.running) {
       return;
@@ -138,15 +148,7 @@ class Simulation {
 
     this.track.draw(ctx);
 
-    const { datapoints } = this.simulationData;
-    ctx.beginPath();
-    ctx.moveTo(datapoints[0].position[0], datapoints[0].position[1]);
-    for (let i = 1; i < datapoints.length; i++) {
-      const { position } = datapoints[i];
-      ctx.strokeStyle = 'aquamarine';
-      ctx.lineTo(position[0], position[1]);
-    }
-    ctx.stroke();
+    this.drawTrails(ctx, trails);
 
     const inputs = this.car.getNormalizedSensorValues();
     const [throttle, brake, steer] = this.network.evaluateAndDraw(inputs, netCanvasParams);
@@ -181,6 +183,44 @@ class Simulation {
     document.querySelector('#individual').innerHTML = `Fitness: ${fitness.toFixed(
       2
     )}, Avg. Speed: ${avgSpeed.toFixed(2)}`;
+  }
+
+  private drawTrails(ctx: CanvasRenderingContext2D, trails: Vector2[][]) {
+    for (const trail of trails) {
+      if (trail.length === 0) {
+        continue;
+      }
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(trail[0][0], trail[0][1]);
+      for (let i = 1; i < trail.length; i++) {
+        ctx.lineTo(trail[i][0], trail[i][1]);
+      }
+      ctx.stroke();
+
+      // Draw cross
+      ctx.strokeStyle = '#ff5050';
+      ctx.beginPath();
+      ctx.save();
+      ctx.translate(trail[trail.length - 1][0], trail[trail.length - 1][1]);
+      ctx.moveTo(-4, -4);
+      ctx.lineTo(4, 4);
+      ctx.moveTo(-4, 4);
+      ctx.lineTo(4, -4);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    const { datapoints } = this.simulationData;
+    ctx.strokeStyle = 'aquamarine';
+    ctx.beginPath();
+    ctx.moveTo(datapoints[0].position[0], datapoints[0].position[1]);
+    for (let i = 1; i < datapoints.length; i++) {
+      const { position } = datapoints[i];
+      ctx.lineTo(position[0], position[1]);
+    }
+    ctx.stroke();
   }
 
   private drawFitness({ ctx, width, height }: CanvasParams, [throttle, brake, steer]: number[]) {
