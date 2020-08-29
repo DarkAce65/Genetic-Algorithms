@@ -27,15 +27,7 @@ class Simulation {
   bindToWorld(world: World, finishCallback: (fitness: number) => void): void {
     world.clear();
 
-    this.world = world;
-    this.checkpoint = 0;
-    this.laps = 0;
-    this.simulationData = [];
-
     this.track.addToWorld(world);
-
-    this.car.chassis.body.position = this.track.initialPosition;
-    this.car.chassis.body.angle = this.track.initialAngle - Math.PI / 2;
 
     world.addBody(this.car.chassis.body);
     this.car.tdv.addToWorld(world);
@@ -43,9 +35,19 @@ class Simulation {
     this.collisionHandler = this.makeCollisionHandler(finishCallback);
     world.on('beginContact', this.collisionHandler);
 
-    this.running = true;
+    this.world = world;
+  }
+
+  start(): void {
+    this.checkpoint = 0;
+    this.laps = 0;
+    this.simulationData = [];
+
+    this.car.chassis.body.position = this.track.initialPosition;
+    this.car.chassis.body.angle = this.track.initialAngle - Math.PI / 2;
 
     this.simulationData.push({ speed: this.car.getAvgSpeed(), fitness: this.fitness() });
+    this.running = true;
   }
 
   unbind(): void {
