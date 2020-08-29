@@ -3,6 +3,7 @@ export type CanvasParams = { ctx: CanvasRenderingContext2D; width: number; heigh
 
 export const MOVING_AVERAGE_ALPHA = 0.1;
 export const MINIMUM_AVERAGE_SPEED = 0.1;
+export const TICKS_TO_WAIT_FOR_STOP = 100;
 
 export const DEFAULT_TRACK_WIDTH = 80;
 export const WALL_THICKNESS = 5;
