@@ -8,10 +8,11 @@ import {
   CanvasParams,
   MINIMUM_AVERAGE_SPEED,
   TICKS_TO_WAIT_FOR_STOP,
+  Vector2,
 } from './constants';
 import { wrappedModulo } from './utils';
 
-type SimulationDataPoint = { speed: number; fitness: number };
+type SimulationDataPoint = { position: Vector2; speed: number; fitness: number };
 type SimulationData = {
   datapoints: SimulationDataPoint[];
   minSpeed: number;
@@ -53,7 +54,11 @@ class Simulation {
     this.car.chassis.body.position = p2.vec2.clone(this.track.initialPosition);
     this.car.chassis.body.angle = this.track.initialAngle - Math.PI / 2;
 
-    this.simulationData.datapoints.push({ speed: this.car.getAvgSpeed(), fitness: this.fitness() });
+    this.simulationData.datapoints.push({
+      position: p2.vec2.clone(this.car.chassis.body.position),
+      speed: this.car.getAvgSpeed(),
+      fitness: this.fitness(),
+    });
     this.running = true;
   }
 
@@ -124,6 +129,16 @@ class Simulation {
 
     this.track.draw(ctx);
 
+    const { datapoints } = this.simulationData;
+    ctx.beginPath();
+    ctx.moveTo(datapoints[0].position[0], datapoints[0].position[1]);
+    for (let i = 1; i < datapoints.length; i++) {
+      const { position } = datapoints[i];
+      ctx.strokeStyle = 'aquamarine';
+      ctx.lineTo(position[0], position[1]);
+    }
+    ctx.stroke();
+
     const inputs = this.car.getNormalizedSensorValues();
     const [throttle, brake, steer] = this.network.evaluateAndDraw(inputs, netCanvasParams);
 
@@ -132,7 +147,11 @@ class Simulation {
 
     const avgSpeed = this.car.getAvgSpeed();
     const fitness = this.fitness();
-    this.simulationData.datapoints.push({ speed: avgSpeed, fitness });
+    this.simulationData.datapoints.push({
+      position: p2.vec2.clone(this.car.chassis.body.position),
+      speed: avgSpeed,
+      fitness,
+    });
     this.simulationData.maxSpeed = Math.max(this.simulationData.maxSpeed, avgSpeed);
     this.simulationData.minSpeed = Math.min(this.simulationData.minSpeed, avgSpeed);
     this.simulationData.bestFitness = Math.max(this.simulationData.bestFitness, fitness);
