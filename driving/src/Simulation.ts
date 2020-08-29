@@ -12,7 +12,12 @@ import {
 import { wrappedModulo } from './utils';
 
 type SimulationDataPoint = { speed: number; fitness: number };
-type SimulationData = { datapoints: SimulationDataPoint[]; bestFitness: number };
+type SimulationData = {
+  datapoints: SimulationDataPoint[];
+  minSpeed: number;
+  maxSpeed: number;
+  bestFitness: number;
+};
 
 class Simulation {
   private world: World;
@@ -42,7 +47,7 @@ class Simulation {
   start(): void {
     this.checkpoint = 0;
     this.laps = 0;
-    this.simulationData = { datapoints: [], bestFitness: 0 };
+    this.simulationData = { datapoints: [], minSpeed: 0, maxSpeed: 1, bestFitness: 0 };
     this.stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
 
     this.car.chassis.body.position = p2.vec2.clone(this.track.initialPosition);
@@ -127,8 +132,10 @@ class Simulation {
 
     const avgSpeed = this.car.getAvgSpeed();
     const fitness = this.fitness();
-    this.simulationData.bestFitness = Math.max(this.simulationData.bestFitness, fitness);
     this.simulationData.datapoints.push({ speed: avgSpeed, fitness });
+    this.simulationData.maxSpeed = Math.max(this.simulationData.maxSpeed, avgSpeed);
+    this.simulationData.minSpeed = Math.min(this.simulationData.minSpeed, avgSpeed);
+    this.simulationData.bestFitness = Math.max(this.simulationData.bestFitness, fitness);
 
     this.drawFitness(fitnessCanvasParams, [throttle, brake, steer]);
 
@@ -159,15 +166,23 @@ class Simulation {
 
     const { datapoints } = this.simulationData;
     if (datapoints.length > 0) {
+      const { minSpeed, maxSpeed } = this.simulationData;
+      if (minSpeed < 0) {
+        ctx.strokeStyle = 'gray';
+        ctx.beginPath();
+        ctx.moveTo(0, (-minSpeed / (maxSpeed - minSpeed)) * height);
+        ctx.lineTo(width, (-minSpeed / (maxSpeed - minSpeed)) * height);
+        ctx.stroke();
+      }
+
       ctx.strokeStyle = 'aqua';
       ctx.beginPath();
-      let max = 1;
-      for (const datapoint of datapoints) {
-        max = Math.max(max, datapoint.speed);
-      }
-      ctx.moveTo(0, (datapoints[0].speed / max) * height);
+      ctx.moveTo(0, ((datapoints[0].speed - minSpeed) / (maxSpeed - minSpeed)) * height);
       for (let i = 1; i < datapoints.length; i++) {
-        ctx.lineTo((i / (datapoints.length - 1)) * width, (datapoints[i].speed / max) * height);
+        ctx.lineTo(
+          (i / (datapoints.length - 1)) * width,
+          ((datapoints[i].speed - minSpeed) / (maxSpeed - minSpeed)) * height
+        );
       }
       ctx.stroke();
     }
