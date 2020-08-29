@@ -6,12 +6,14 @@ import Track, { Checkpoint } from './Track';
 import { CHECKPOINT_MASK, CanvasParams } from './constants';
 import { wrappedModulo } from './utils';
 
+type SimulationDataPoint = { speed: number; fitness: number };
+
 class Simulation {
   private world: World;
   private checkpoint: number;
   private laps: number;
 
-  private fitnessData;
+  private simulationData: SimulationDataPoint[];
   private running = false;
 
   private collisionHandler: (event: World['beginContactEvent']) => void;
@@ -28,7 +30,7 @@ class Simulation {
     this.world = world;
     this.checkpoint = 0;
     this.laps = 0;
-    this.fitnessData = [];
+    this.simulationData = [];
 
     this.track.addToWorld(world);
 
@@ -42,6 +44,8 @@ class Simulation {
     world.on('beginContact', this.collisionHandler);
 
     this.running = true;
+
+    this.simulationData.push({ speed: this.car.getAvgSpeed(), fitness: this.fitness() });
   }
 
   unbind(): void {
@@ -52,31 +56,6 @@ class Simulation {
     this.world.off('beginContact', this.collisionHandler);
     this.collisionHandler = null;
     this.world = null;
-  }
-
-  tick({ ctx, width, height }: CanvasParams, netCanvasParams: CanvasParams): void {
-    if (this.world === null) {
-      throw new Error('Simulation is not bound to a world');
-    }
-
-    if (!this.running) {
-      return;
-    }
-
-    this.world.step(1 / 60);
-
-    ctx.clearRect(0, 0, width, height);
-
-    this.track.draw(ctx);
-
-    const inputs = this.car.getNormalizedSensorValues();
-    const [throttle, brake, steer] = this.network.evaluateAndDraw(inputs, netCanvasParams);
-    this.car.update(this.world, throttle, brake, steer);
-    this.car.draw(ctx, steer);
-
-    document.querySelector('#individual').innerHTML = `Fitness: ${this.fitness().toFixed(
-      2
-    )}, Avg. Speed: ${this.car.getAvgSpeed().toFixed(2)}`;
   }
 
   private makeCollisionHandler(finishCallback: (fitness: number) => void) {
@@ -103,7 +82,7 @@ class Simulation {
     }
   }
 
-  fitness(): number {
+  private fitness(): number {
     return (
       this.laps * this.track.totalTrackLength +
       (this.checkpoint === 0 ? 0 : this.track.checkpoints[this.checkpoint - 1].cumulativeDistance) +
@@ -123,6 +102,67 @@ class Simulation {
       (Math.pow(pt2x - pt0x, 2) + Math.pow(pt2y - pt0y, 2));
 
     return t * this.track.checkpoints[this.checkpoint].trackLength;
+  }
+
+  tick(
+    { ctx, width, height }: CanvasParams,
+    netCanvasParams: CanvasParams,
+    fitnessCanvasParams: CanvasParams
+  ): void {
+    if (this.world === null) {
+      throw new Error('Simulation is not bound to a world');
+    }
+
+    if (!this.running) {
+      return;
+    }
+
+    this.world.step(1 / 60);
+
+    ctx.clearRect(0, 0, width, height);
+
+    this.track.draw(ctx);
+
+    const inputs = this.car.getNormalizedSensorValues();
+    const [throttle, brake, steer] = this.network.evaluateAndDraw(inputs, netCanvasParams);
+
+    this.car.update(this.world, throttle, brake, steer);
+    this.car.draw(ctx, steer);
+
+    this.simulationData.push({ speed: this.car.getAvgSpeed(), fitness: this.fitness() });
+
+    this.drawFitness(fitnessCanvasParams, [throttle, brake, steer]);
+
+    document.querySelector('#individual').innerHTML = `Fitness: ${this.fitness().toFixed(
+      2
+    )}, Avg. Speed: ${this.car.getAvgSpeed().toFixed(2)}`;
+  }
+
+  private drawFitness({ ctx, width, height }: CanvasParams, [throttle, brake, steer]: number[]) {
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.fillStyle = 'white';
+    ctx.fillRect(Math.min(width / 2, steer * width), 0, Math.abs(steer - 0.5) * width, height / 10);
+    ctx.fillRect(width / 9, height / 10, width / 3, (throttle * height * 9) / 10);
+    ctx.fillStyle = '#ff5050';
+    ctx.fillRect((width * 5) / 9, height / 10, width / 3, (brake * height * 9) / 10);
+
+    if (this.simulationData.length > 0) {
+      ctx.strokeStyle = 'aqua';
+      ctx.beginPath();
+      let max = 0;
+      for (let i = 0; i < this.simulationData.length; i++) {
+        max = Math.max(max, this.simulationData[i].speed);
+      }
+      ctx.moveTo(0, (this.simulationData[0].speed / max) * height);
+      for (let i = 1; i < this.simulationData.length; i++) {
+        ctx.lineTo(
+          (i / this.simulationData.length) * width,
+          (this.simulationData[i].speed / max) * height
+        );
+      }
+      ctx.stroke();
+    }
   }
 }
 
