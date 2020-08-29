@@ -23,13 +23,13 @@ type Sensor = {
 };
 
 class Car {
-  readonly chassis: { body: Body; box: Box };
-  readonly tdv: TopDownVehicle;
+  private readonly chassis: { body: Body; box: Box };
+  private readonly tdv: TopDownVehicle;
   private readonly wheels: [WheelConstraint, WheelConstraint, WheelConstraint, WheelConstraint];
 
   private readonly sensors: Sensor[] = [];
 
-  private avgSpeed = 0;
+  avgSpeed = 0;
 
   constructor(
     bodyWidth: number,
@@ -90,18 +90,31 @@ class Car {
     this.wheels = [flWheel, frWheel, blWheel, brWheel];
   }
 
-  getNormalizedSensorValues(): number[] {
-    return this.sensors.map((sensor) =>
-      sensor.hasHit ? sensor.hitDistance / sensor.ray.length : 1
-    );
+  get position(): Vector2 {
+    return this.chassis.body.position;
+  }
+
+  set position(position: Vector2) {
+    this.chassis.body.position = position;
+  }
+
+  set angle(angle: number) {
+    this.chassis.body.angle = angle;
   }
 
   getSpeed(): number {
     return (this.wheels[2].getSpeed() + this.wheels[3].getSpeed()) / 2;
   }
 
-  getAvgSpeed(): number {
-    return this.avgSpeed;
+  getNormalizedSensorValues(): number[] {
+    return this.sensors.map((sensor) =>
+      sensor.hasHit ? sensor.hitDistance / sensor.ray.length : 1
+    );
+  }
+
+  addToWorld(world: World): void {
+    world.addBody(this.chassis.body);
+    this.tdv.addToWorld(world);
   }
 
   update(world: World, throttle: number, brake: number, steer: number): void {

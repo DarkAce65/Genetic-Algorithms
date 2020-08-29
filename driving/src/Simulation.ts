@@ -40,9 +40,7 @@ class Simulation {
     this.world.on('beginContact', this.collisionHandler.bind(this));
 
     this.track.addToWorld(this.world);
-
-    this.world.addBody(this.car.chassis.body);
-    this.car.tdv.addToWorld(this.world);
+    this.car.addToWorld(this.world);
   }
 
   start(): void {
@@ -51,12 +49,12 @@ class Simulation {
     this.simulationData = { datapoints: [], minSpeed: 0, maxSpeed: 1, bestFitness: 0 };
     this.stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
 
-    this.car.chassis.body.position = p2.vec2.clone(this.track.initialPosition);
-    this.car.chassis.body.angle = this.track.initialAngle - Math.PI / 2;
+    this.car.position = p2.vec2.clone(this.track.initialPosition);
+    this.car.angle = this.track.initialAngle - Math.PI / 2;
 
     this.simulationData.datapoints.push({
-      position: p2.vec2.clone(this.car.chassis.body.position),
-      speed: this.car.getAvgSpeed(),
+      position: p2.vec2.clone(this.car.position),
+      speed: this.car.avgSpeed,
       fitness: this.fitness(),
     });
     this.running = true;
@@ -101,7 +99,7 @@ class Simulation {
     const [pt0x, pt0y] = this.track.checkpoints[
       wrappedModulo(this.checkpoint - 1, this.track.checkpoints.length)
     ].position;
-    const [pt1x, pt1y] = this.car.chassis.body.position;
+    const [pt1x, pt1y] = this.car.position;
     const [pt2x, pt2y] = this.track.checkpoints[this.checkpoint].position;
 
     const t =
@@ -145,10 +143,10 @@ class Simulation {
     this.car.update(this.world, throttle, brake, steer);
     this.car.draw(ctx, steer);
 
-    const avgSpeed = this.car.getAvgSpeed();
+    const avgSpeed = this.car.avgSpeed;
     const fitness = this.fitness();
     this.simulationData.datapoints.push({
-      position: p2.vec2.clone(this.car.chassis.body.position),
+      position: p2.vec2.clone(this.car.position),
       speed: avgSpeed,
       fitness,
     });
