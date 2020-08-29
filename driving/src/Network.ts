@@ -5,10 +5,10 @@ import { clamp, squaredSum } from './utils';
 
 type NetworkOptions = {
   numInputs: number;
-  numHiddenNodes: number;
+  numHiddenNodes?: number;
   numOutputs: number;
-  mutationChance: number;
-  mutationAmount: number;
+  mutationChance?: number;
+  mutationAmount?: number;
   parents?: [Network, Network];
 };
 

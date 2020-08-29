@@ -19,14 +19,15 @@ type SimulationData = {
   maxSpeed: number;
   bestFitness: number;
 };
+type SimulationResult = { fitness: number; avgSpeed: number };
 
 class Simulation {
   private world: World;
   private checkpoint: number;
   private laps: number;
 
-  private simulationData: SimulationData;
-  private running = false;
+  readonly simulationData: SimulationData;
+  private completed = false;
   private stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
 
   constructor(
@@ -46,6 +47,8 @@ class Simulation {
       );
     }
 
+    this.simulationData = { datapoints: [], minSpeed: 0, maxSpeed: 1, bestFitness: 0 };
+
     this.world = new World({ gravity: p2.vec2.fromValues(0, 0) });
 
     this.world.on('beginContact', this.collisionHandler.bind(this));
@@ -54,10 +57,13 @@ class Simulation {
     this.car.addToWorld(this.world);
   }
 
-  start(): void {
+  initialize(): void {
     this.checkpoint = 0;
     this.laps = 0;
-    this.simulationData = { datapoints: [], minSpeed: 0, maxSpeed: 1, bestFitness: 0 };
+    this.simulationData.datapoints = [];
+    this.simulationData.minSpeed = 0;
+    this.simulationData.maxSpeed = 1;
+    this.simulationData.bestFitness = 0;
     this.stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
 
     this.car.position = p2.vec2.clone(this.track.initialPosition);
@@ -68,11 +74,11 @@ class Simulation {
       speed: this.car.avgSpeed,
       fitness: this.fitness(),
     });
-    this.running = true;
+    this.completed = false;
   }
 
   finish(): void {
-    this.running = false;
+    this.completed = true;
 
     this.finishCallback(this.simulationData.bestFitness);
   }
@@ -132,10 +138,10 @@ class Simulation {
   tick(
     { ctx, width, height }: CanvasParams,
     netCanvasParams: CanvasParams,
-    fitnessCanvasParams: CanvasParams,
+    carStatusCanvasParams: CanvasParams,
     trails: Vector2[][]
-  ): void {
-    if (!this.running) {
+  ): SimulationResult {
+    if (this.completed) {
       return;
     }
 
@@ -167,7 +173,7 @@ class Simulation {
     this.simulationData.minSpeed = Math.min(this.simulationData.minSpeed, avgSpeed);
     this.simulationData.bestFitness = Math.max(this.simulationData.bestFitness, fitness);
 
-    this.drawFitness(fitnessCanvasParams, [throttle, brake, steer]);
+    this.drawCarStatus(carStatusCanvasParams, [throttle, brake, steer]);
 
     if (Math.abs(avgSpeed) < MINIMUM_AVERAGE_SPEED) {
       this.stoppedTicks--;
@@ -175,14 +181,7 @@ class Simulation {
       this.stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
     }
 
-    document.querySelector(
-      '#genetic'
-    ).innerHTML = `Generation: ${0}, Genome: ${0}<br>Best Fitness: ${this.simulationData.bestFitness.toFixed(
-      2
-    )}`;
-    document.querySelector('#individual').innerHTML = `Fitness: ${fitness.toFixed(
-      2
-    )}, Avg. Speed: ${avgSpeed.toFixed(2)}`;
+    return { fitness, avgSpeed };
   }
 
   private drawTrails(ctx: CanvasRenderingContext2D, trails: Vector2[][]) {
@@ -223,7 +222,7 @@ class Simulation {
     ctx.stroke();
   }
 
-  private drawFitness({ ctx, width, height }: CanvasParams, [throttle, brake, steer]: number[]) {
+  private drawCarStatus({ ctx, width, height }: CanvasParams, [throttle, brake, steer]: number[]) {
     ctx.clearRect(0, 0, width, height);
 
     ctx.fillStyle = 'white';
