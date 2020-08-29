@@ -9,7 +9,6 @@ type NetworkOptions = {
   numOutputs: number;
   mutationChance: number;
   mutationAmount: number;
-
   parents?: [Network, Network];
 };
 
@@ -18,7 +17,7 @@ type NetworkStructure = { numInputs: number; numHiddenNodes: number; numOutputs:
 const networkColorScale = chroma.scale(['aquamarine', '#222222', 'white']).domain([-1, 1]);
 
 class Network {
-  private readonly networkStructure: NetworkStructure;
+  readonly structure: NetworkStructure;
 
   private inputLayerWeights: number[] = [];
   private hiddenLayerWeights: number[] = [];
@@ -31,7 +30,6 @@ class Network {
     numOutputs,
     mutationChance = 0.1,
     mutationAmount = 0.1,
-
     parents,
   }: NetworkOptions) {
     if (parents) {
@@ -75,7 +73,7 @@ class Network {
 
     this.weightsSquared = squaredSum(this.inputLayerWeights) + squaredSum(this.hiddenLayerWeights);
 
-    this.networkStructure = { numInputs, numHiddenNodes, numOutputs };
+    this.structure = { numInputs, numHiddenNodes, numOutputs };
   }
 
   loadWeights(input: number[], hidden: number[]): void {
@@ -94,7 +92,7 @@ class Network {
   }
 
   private evaluate(inputs: number[]): [number[], number[]] {
-    const { numInputs, numHiddenNodes, numOutputs } = this.networkStructure;
+    const { numInputs, numHiddenNodes, numOutputs } = this.structure;
 
     const hiddenLayer: number[] = new Array(numHiddenNodes).fill(0);
     const outputs: number[] = new Array(numOutputs).fill(0);
@@ -116,7 +114,7 @@ class Network {
   }
 
   private drawNetWeights({ ctx, width, height }: CanvasParams): void {
-    const { numInputs, numHiddenNodes, numOutputs } = this.networkStructure;
+    const { numInputs, numHiddenNodes, numOutputs } = this.structure;
 
     for (let i = 0; i < numInputs; i++) {
       const p = (i + 0.5) / numInputs;

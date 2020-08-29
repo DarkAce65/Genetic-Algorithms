@@ -35,6 +35,17 @@ class Simulation {
     private readonly track: Track,
     private readonly finishCallback: (fitness: number) => void
   ) {
+    if (network.structure.numInputs !== car.numSensors) {
+      throw new Error(
+        `Given network has an invalid number of inputs - must match number of sensors of car (${car.numSensors}) but got ${network.structure.numInputs}`
+      );
+    }
+    if (network.structure.numOutputs !== 3) {
+      throw new Error(
+        `Given network has an invalid number of outputs - must be 3 but got ${network.structure.numOutputs}`
+      );
+    }
+
     this.world = new World({ gravity: p2.vec2.fromValues(0, 0) });
 
     this.world.on('beginContact', this.collisionHandler.bind(this));

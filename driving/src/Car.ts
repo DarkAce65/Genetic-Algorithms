@@ -102,6 +102,10 @@ class Car {
     this.chassis.body.angle = angle;
   }
 
+  get numSensors(): number {
+    return this.sensors.length;
+  }
+
   getSpeed(): number {
     return (this.wheels[2].getSpeed() + this.wheels[3].getSpeed()) / 2;
   }
