@@ -12,13 +12,14 @@ import {
 import { wrappedModulo } from './utils';
 
 type SimulationDataPoint = { speed: number; fitness: number };
+type SimulationData = { datapoints: SimulationDataPoint[]; bestFitness: number };
 
 class Simulation {
   private world: World;
   private checkpoint: number;
   private laps: number;
 
-  private simulationData: SimulationDataPoint[];
+  private simulationData: SimulationData;
   private running = false;
   private stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
 
@@ -47,13 +48,13 @@ class Simulation {
   start(): void {
     this.checkpoint = 0;
     this.laps = 0;
-    this.simulationData = [];
+    this.simulationData = { datapoints: [], bestFitness: 0 };
     this.stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
 
     this.car.chassis.body.position = this.track.initialPosition;
     this.car.chassis.body.angle = this.track.initialAngle - Math.PI / 2;
 
-    this.simulationData.push({ speed: this.car.getAvgSpeed(), fitness: this.fitness() });
+    this.simulationData.datapoints.push({ speed: this.car.getAvgSpeed(), fitness: this.fitness() });
     this.running = true;
   }
 
@@ -144,16 +145,24 @@ class Simulation {
     this.car.draw(ctx, steer);
 
     const avgSpeed = this.car.getAvgSpeed();
-    this.simulationData.push({ speed: avgSpeed, fitness: this.fitness() });
+    const fitness = this.fitness();
+    this.simulationData.bestFitness = Math.max(this.simulationData.bestFitness, fitness);
+    this.simulationData.datapoints.push({ speed: avgSpeed, fitness });
+
+    this.drawFitness(fitnessCanvasParams, [throttle, brake, steer]);
+
     if (Math.abs(avgSpeed) < MINIMUM_AVERAGE_SPEED) {
       this.stoppedTicks--;
     } else if (this.stoppedTicks !== TICKS_TO_WAIT_FOR_STOP) {
       this.stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
     }
 
-    this.drawFitness(fitnessCanvasParams, [throttle, brake, steer]);
-
-    document.querySelector('#individual').innerHTML = `Fitness: ${this.fitness().toFixed(
+    document.querySelector(
+      '#genetic'
+    ).innerHTML = `Generation: ${0}, Genome: ${0}<br>Best Fitness: ${this.simulationData.bestFitness.toFixed(
+      2
+    )}`;
+    document.querySelector('#individual').innerHTML = `Fitness: ${fitness.toFixed(
       2
     )}, Avg. Speed: ${avgSpeed.toFixed(2)}`;
   }
@@ -167,19 +176,17 @@ class Simulation {
     ctx.fillStyle = '#ff5050';
     ctx.fillRect((width * 5) / 9, height / 10, width / 3, (brake * height * 9) / 10);
 
-    if (this.simulationData.length > 0) {
+    const { datapoints } = this.simulationData;
+    if (datapoints.length > 0) {
       ctx.strokeStyle = 'aqua';
       ctx.beginPath();
       let max = 1;
-      for (let i = 0; i < this.simulationData.length; i++) {
-        max = Math.max(max, this.simulationData[i].speed);
+      for (const datapoint of datapoints) {
+        max = Math.max(max, datapoint.speed);
       }
-      ctx.moveTo(0, (this.simulationData[0].speed / max) * height);
-      for (let i = 1; i < this.simulationData.length; i++) {
-        ctx.lineTo(
-          (i / (this.simulationData.length - 1)) * width,
-          (this.simulationData[i].speed / max) * height
-        );
+      ctx.moveTo(0, (datapoints[0].speed / max) * height);
+      for (let i = 1; i < datapoints.length; i++) {
+        ctx.lineTo((i / (datapoints.length - 1)) * width, (datapoints[i].speed / max) * height);
       }
       ctx.stroke();
     }
