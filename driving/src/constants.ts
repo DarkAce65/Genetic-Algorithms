@@ -1,6 +1,8 @@
 export type Vector2 = [number, number];
 export type CanvasParams = { ctx: CanvasRenderingContext2D; width: number; height: number };
 
+export const MOVING_AVERAGE_ALPHA = 0.1;
+
 export const DEFAULT_TRACK_WIDTH = 80;
 export const WALL_THICKNESS = 5;
 

@@ -11,7 +11,12 @@ import {
 } from './constants';
 import { wrappedModulo } from './utils';
 
-type Checkpoint = { number: number; cumulativeDistance: number; body: Body };
+export interface Checkpoint extends Body {
+  index: number;
+  trackLength: number;
+  cumulativeDistance: number;
+  lastCheckpoint: boolean;
+}
 
 type TrackPoint = { position: Vector2; width?: number };
 type TrackDefinition = TrackPoint[];
@@ -36,15 +41,15 @@ const constructWall = (point0: Vector2, point1: Vector2): Body => {
   return wall;
 };
 
-const constructCheckpoint = (point0: Vector2, point1: Vector2): Body => {
+const constructCheckpointBody = (point0: Vector2, point1: Vector2): Body => {
   const [pt0x, pt0y] = point0;
   const [pt1x, pt1y] = point1;
 
-  const checkpoint = new Body({
+  const body = new Body({
     position: [(pt0x + pt1x) / 2, (pt0y + pt1y) / 2],
     angle: Math.atan2(pt1y - pt0y, pt1x - pt0x),
   });
-  checkpoint.addShape(
+  body.addShape(
     new Box({
       width: p2.vec2.dist(point0, point1),
       height: 0.5,
@@ -54,12 +59,12 @@ const constructCheckpoint = (point0: Vector2, point1: Vector2): Body => {
     })
   );
 
-  return checkpoint;
+  return body;
 };
 
 class Track {
   private readonly walls: Body[] = [];
-  private readonly checkpoints: Checkpoint[] = [];
+  readonly checkpoints: Checkpoint[] = [];
 
   readonly totalTrackLength: number;
   readonly initialPosition: Vector2;
@@ -101,22 +106,27 @@ class Track {
 
     this.totalTrackLength = 0;
     for (let i = 0; i < trackPoints.length; i++) {
-      this.totalTrackLength += p2.vec2.dist(
+      const trackLength = p2.vec2.dist(
         trackPoints[i].position,
         trackPoints[(i + 1) % trackPoints.length].position
       );
+      this.totalTrackLength += trackLength;
 
       this.walls.push(constructWall(leftPoints[i], leftPoints[(i + 1) % trackPoints.length]));
       this.walls.push(constructWall(rightPoints[i], rightPoints[(i + 1) % trackPoints.length]));
 
-      const checkpoint = {
-        number: i,
-        cumulativeDistance: this.totalTrackLength,
-        body: constructCheckpoint(
+      const checkpoint: Checkpoint = Object.assign(
+        constructCheckpointBody(
           leftPoints[(i + 1) % trackPoints.length],
           rightPoints[(i + 1) % trackPoints.length]
         ),
-      };
+        {
+          index: i,
+          trackLength,
+          cumulativeDistance: this.totalTrackLength,
+          lastCheckpoint: i === trackPoints.length - 1,
+        }
+      );
       this.checkpoints.push(checkpoint);
     }
   }
@@ -126,7 +136,7 @@ class Track {
       world.addBody(wall);
     }
     for (const checkpoint of this.checkpoints) {
-      world.addBody(checkpoint.body);
+      world.addBody(checkpoint);
     }
   }
 
@@ -156,12 +166,12 @@ class Track {
   }
 
   private drawCheckpoint(ctx: CanvasRenderingContext2D, checkpoint: Checkpoint) {
-    const box = checkpoint.body.shapes[0] as Box;
+    const box = checkpoint.shapes[0] as Box;
 
     ctx.beginPath();
     ctx.save();
-    ctx.translate(checkpoint.body.position[0], checkpoint.body.position[1]);
-    ctx.rotate(checkpoint.body.angle);
+    ctx.translate(checkpoint.position[0], checkpoint.position[1]);
+    ctx.rotate(checkpoint.angle);
     ctx.rect(-box.width / 2, -box.height / 2, box.width, box.height);
     ctx.stroke();
     ctx.restore();

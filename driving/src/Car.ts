@@ -1,6 +1,13 @@
 import p2, { Body, Box, Ray, RaycastResult, TopDownVehicle, WheelConstraint, World } from 'p2';
 
-import { CAR_MASK, CHECKPOINT_MASK, SENSOR_MASK, Vector2, WALL_MASK } from './constants';
+import {
+  CAR_MASK,
+  CHECKPOINT_MASK,
+  MOVING_AVERAGE_ALPHA,
+  SENSOR_MASK,
+  Vector2,
+  WALL_MASK,
+} from './constants';
 
 type SensorOptions = { numSensors?: number; sensorLength?: number; sensorAngle?: number };
 type Sensor = {
@@ -21,10 +28,12 @@ class Car {
 
   private readonly sensors: Sensor[] = [];
 
+  private avgSpeed = 0;
+
   constructor(
     bodyWidth: number,
     bodyHeight: number,
-    { numSensors = 3, sensorLength = 120, sensorAngle = (90 * Math.PI) / 180 }: SensorOptions = {}
+    { numSensors = 3, sensorLength = 120, sensorAngle = 90 * (Math.PI / 180) }: SensorOptions = {}
   ) {
     const chassisBody = new Body({ mass: 1 });
     const chassisBox = new Box({
@@ -90,6 +99,10 @@ class Car {
     return (this.wheels[2].getSpeed() + this.wheels[3].getSpeed()) / 2;
   }
 
+  getAvgSpeed(): number {
+    return this.avgSpeed;
+  }
+
   update(world: World, throttle: number, brake: number, steer: number): void {
     const steerValue = 0.63 * -(steer * 2 - 1);
     const engineForce = 150 * throttle;
@@ -105,6 +118,8 @@ class Car {
     this.wheels[3].setBrakeForce(brakeForce);
 
     this.computeSensorIntersections(world);
+
+    this.avgSpeed += MOVING_AVERAGE_ALPHA * (this.getSpeed() - this.avgSpeed);
   }
 
   private computeSensorIntersections(world: World) {
