@@ -3,6 +3,7 @@ import p2, { Body, Box, Ray, RaycastResult, TopDownVehicle, WheelConstraint, Wor
 import {
   CAR_MASK,
   CHECKPOINT_MASK,
+  MINIMUM_AVERAGE_SPEED,
   MOVING_AVERAGE_ALPHA,
   SENSOR_MASK,
   Vector2,
@@ -159,7 +160,14 @@ class Car {
   draw(ctx: CanvasRenderingContext2D, steer: number): void {
     this.drawSensors(ctx);
 
-    ctx.strokeStyle = 'white';
+    if (Math.abs(this.avgSpeed) > MINIMUM_AVERAGE_SPEED) {
+      ctx.strokeStyle = 'white';
+      ctx.fillStyle = 'rgba(18, 18, 18, 0.8)';
+    } else {
+      ctx.strokeStyle = 'gray';
+      ctx.fillStyle = 'rgba(18, 18, 18, 0.8)';
+    }
+
     const [x, y] = this.chassis.body.position;
     const w = this.chassis.box.width;
     const h = this.chassis.box.height;
@@ -169,7 +177,6 @@ class Car {
     ctx.rotate(this.chassis.body.angle);
 
     ctx.translate(-w / 2, -h / 2);
-    ctx.fillStyle = 'rgba(18, 18, 18, 0.8)';
     ctx.fillRect(0, 0, w, h);
     ctx.beginPath();
     ctx.rect(0, 0, w, h);
