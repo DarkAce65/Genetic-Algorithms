@@ -1,4 +1,4 @@
-import { World } from 'p2';
+import p2, { World } from 'p2';
 
 import Car from './Car';
 import Network from './Network';
@@ -23,26 +23,20 @@ class Simulation {
   private running = false;
   private stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
 
-  private finishCallback: (fitness: number) => void;
-
   constructor(
     private readonly network: Network,
     private readonly car: Car,
-    private readonly track: Track
-  ) {}
+    private readonly track: Track,
+    private readonly finishCallback: (fitness: number) => void
+  ) {
+    this.world = new World({ gravity: p2.vec2.fromValues(0, 0) });
 
-  bindToWorld(world: World, finishCallback: (fitness: number) => void): void {
-    world.clear();
+    this.world.on('beginContact', this.collisionHandler.bind(this));
 
-    this.track.addToWorld(world);
+    this.track.addToWorld(this.world);
 
-    world.addBody(this.car.chassis.body);
-    this.car.tdv.addToWorld(world);
-
-    world.on('beginContact', this.collisionHandler.bind(this));
-
-    this.world = world;
-    this.finishCallback = finishCallback;
+    this.world.addBody(this.car.chassis.body);
+    this.car.tdv.addToWorld(this.world);
   }
 
   start(): void {
@@ -51,7 +45,7 @@ class Simulation {
     this.simulationData = { datapoints: [], bestFitness: 0 };
     this.stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
 
-    this.car.chassis.body.position = this.track.initialPosition;
+    this.car.chassis.body.position = p2.vec2.clone(this.track.initialPosition);
     this.car.chassis.body.angle = this.track.initialAngle - Math.PI / 2;
 
     this.simulationData.datapoints.push({ speed: this.car.getAvgSpeed(), fitness: this.fitness() });
@@ -59,18 +53,9 @@ class Simulation {
   }
 
   finish(): void {
-    this.finishCallback(this.fitness());
     this.running = false;
-  }
 
-  unbind(): void {
-    if (this.world === null) {
-      throw new Error('Simulation is not bound to a world');
-    }
-
-    this.world.off('beginContact', this.collisionHandler);
-    this.collisionHandler = null;
-    this.world = null;
+    this.finishCallback(this.simulationData.bestFitness);
   }
 
   private collisionHandler(event: World['beginContactEvent']) {
@@ -121,10 +106,6 @@ class Simulation {
     netCanvasParams: CanvasParams,
     fitnessCanvasParams: CanvasParams
   ): void {
-    if (this.world === null) {
-      throw new Error('Simulation is not bound to a world');
-    }
-
     if (!this.running) {
       return;
     }
