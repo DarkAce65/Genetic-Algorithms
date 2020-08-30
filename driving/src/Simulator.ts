@@ -4,8 +4,24 @@ import Simulation from './Simulation';
 import Track from './Track';
 import { CanvasParams, Vector2 } from './constants';
 
+type SimulatorControls = {
+  generationSize?: number;
+  numHiddenNodes?: number;
+  numSensors: number;
+  sensorLength?: number;
+  sensorAngle?: number;
+};
+
+const DEFAULT_CONTROLS: SimulatorControls = {
+  generationSize: 20,
+  numHiddenNodes: 5,
+  numSensors: 3,
+};
+
 class Simulator {
   private running = false;
+
+  private simulatorControls: SimulatorControls;
 
   private generation = 0;
   private genome = 0;
@@ -19,21 +35,31 @@ class Simulator {
     private readonly track: Track,
     private readonly simCanvasParams: CanvasParams,
     private readonly netCanvasParams: CanvasParams,
-    private readonly carStatusCanvasParams: CanvasParams
+    private readonly carStatusCanvasParams: CanvasParams,
+    simulatorControls: SimulatorControls
   ) {
     this.handleSimulationComplete = this.handleSimulationComplete.bind(this);
     this.run = this.run.bind(this);
 
+    this.simulatorControls = {
+      ...DEFAULT_CONTROLS,
+      ...simulatorControls,
+    };
     this.reset();
   }
 
-  private reset(): void {
+  reset(): void {
+    this.running = false;
     this.generation = 0;
     this.genome = 0;
     this.bestFitness = 0;
 
     this.trails = [];
     this.activeSimulation = this.createNewSimulation();
+
+    const { ctx, width, height } = this.simCanvasParams;
+    ctx.clearRect(0, 0, width, height);
+    this.track.draw(this.simCanvasParams.ctx);
   }
 
   start(): void {
@@ -50,9 +76,20 @@ class Simulator {
     this.run();
   }
 
+  killCurrentSimulation(): void {
+    if (this.activeSimulation === null) {
+      console.error('No active simulation');
+      return;
+    }
+
+    this.handleSimulationComplete();
+  }
+
   private createNewSimulation(): Simulation {
-    const car = new Car(20, 40, { numSensors: 3 });
-    const network = new Network({ numInputs: 3, numOutputs: 3 });
+    const { numHiddenNodes, numSensors, sensorLength, sensorAngle } = this.simulatorControls;
+
+    const car = new Car(20, 40, { numSensors, sensorLength, sensorAngle });
+    const network = new Network({ numInputs: numSensors, numHiddenNodes, numOutputs: 3 });
     return new Simulation(network, car, this.track, this.handleSimulationComplete);
   }
 
@@ -70,6 +107,10 @@ class Simulator {
   }
 
   private run(): void {
+    if (!this.running) {
+      return;
+    }
+
     if (this.activeSimulation === null) {
       console.error('No active simulation');
       return;
@@ -94,9 +135,7 @@ class Simulator {
       2
     )}, Avg. Speed: ${avgSpeed.toFixed(2)}`;
 
-    if (this.running) {
-      requestAnimationFrame(this.run);
-    }
+    requestAnimationFrame(this.run);
   }
 }
 
