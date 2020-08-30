@@ -54,10 +54,7 @@ const trackPoints: Vector2[] = [
 ];
 const track = new Track(trackPoints.map((position) => ({ position })));
 
-const simulator = new Simulator(track, simCanvasParams, netCanvasParams, carStatusCanvasParams, {
-  numSensors: 3,
-  numHiddenNodes: 10,
-});
+const simulator = new Simulator(track, simCanvasParams, netCanvasParams, carStatusCanvasParams);
 
 document.querySelector('#start').addEventListener('click', () => simulator.start());
 document.querySelector('#kill').addEventListener('click', () => simulator.killCurrentSimulation());

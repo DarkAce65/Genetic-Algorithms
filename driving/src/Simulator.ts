@@ -51,7 +51,7 @@ class Simulator {
     private readonly simCanvasParams: CanvasParams,
     private readonly netCanvasParams: CanvasParams,
     private readonly carStatusCanvasParams: CanvasParams,
-    simulatorControls: SimulatorControls
+    simulatorControls: SimulatorControls = {}
   ) {
     this.handleSimulationComplete = this.handleSimulationComplete.bind(this);
     this.run = this.run.bind(this);
