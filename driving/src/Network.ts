@@ -146,7 +146,7 @@ class Network {
       }
     }
 
-    const drawNodes = (x, numNodes) => {
+    const drawNodes = (x: number, numNodes: number): void => {
       for (let i = 0; i < numNodes; i++) {
         const p = (i + 0.5) / numNodes;
         ctx.beginPath();
@@ -205,7 +205,7 @@ class Network {
       for (let j = 0; j < numHiddenNodes; j++) {
         const pn = (j + 0.5) / numHiddenNodes;
         const w = this.inputLayerWeights[i * numHiddenNodes + j];
-        ctx.strokeStyle = networkColorScale(w);
+        ctx.strokeStyle = networkColorScale(w).hex();
         ctx.beginPath();
         ctx.moveTo(30, p * height);
         ctx.lineTo(width / 2, pn * height);
@@ -218,7 +218,7 @@ class Network {
       for (let j = 0; j < numOutputs; j++) {
         const pn = (j + 0.5) / numOutputs;
         const w = this.hiddenLayerWeights[i * numOutputs + j];
-        ctx.strokeStyle = networkColorScale(w);
+        ctx.strokeStyle = networkColorScale(w).hex();
         ctx.beginPath();
         ctx.moveTo(width / 2, p * height);
         ctx.lineTo(width - 30, pn * height);
@@ -233,11 +233,11 @@ class Network {
     hidden: number[],
     output: number[]
   ): void {
-    const drawNodes = (x, nodes) => {
+    const drawNodes = (x: number, nodes: number[]): void => {
       for (let i = 0; i < nodes.length; i++) {
         const p = (i + 0.5) / nodes.length;
         const w = nodes[i];
-        ctx.fillStyle = networkColorScale(w);
+        ctx.fillStyle = networkColorScale(w).hex();
         ctx.beginPath();
         ctx.arc(x, p * height, 5, 0, 2 * Math.PI);
         ctx.fill();
