@@ -63,7 +63,7 @@ class Car {
     frWheel.setBrakeForce(20);
 
     for (let s = 0; s < numSensors; s++) {
-      const r = s / (numSensors - 1);
+      const r = numSensors === 1 ? 0.5 : s / (numSensors - 1);
       const w = bodyWidth * 0.9;
       const h = bodyHeight * 0.9;
       const localFrom = p2.vec2.fromValues(-w / 2 + w * r, h / 2);
