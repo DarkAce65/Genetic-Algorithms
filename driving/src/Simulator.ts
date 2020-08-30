@@ -78,8 +78,6 @@ class Simulator {
     this.scoresAndNetwork = [];
     this.generationTrails = [];
 
-    this.activeSimulation = this.createNewSimulation();
-
     const { ctx, width, height } = this.simCanvasParams;
     ctx.clearRect(0, 0, width, height);
     this.track.draw(this.simCanvasParams.ctx);
@@ -102,6 +100,7 @@ class Simulator {
     }
 
     this.running = true;
+    this.activeSimulation = this.createNewSimulation();
     this.activeSimulation.initialize();
 
     document.querySelector('#genetic').innerHTML = `Generation: ${this.generation}, Genome: ${
