@@ -10,8 +10,12 @@ import {
   WALL_MASK,
 } from './constants';
 
-type SensorOptions = { numSensors?: number; sensorLength?: number; sensorAngle?: number };
-type Sensor = {
+interface SensorOptions {
+  numSensors?: number;
+  sensorLength?: number;
+  sensorAngle?: number;
+}
+interface Sensor {
   localFrom: Vector2;
   localTo: Vector2;
   ray: Ray;
@@ -20,7 +24,7 @@ type Sensor = {
   hitDistance?: number;
   hitPoint?: Vector2;
   hitNormal?: Vector2;
-};
+}
 
 class Car {
   private readonly chassis: { body: Body; box: Box };

@@ -4,26 +4,20 @@ import Simulation from './Simulation';
 import Track from './Track';
 import { CanvasParams, Vector2 } from './constants';
 
-type GenerationParams = {
+interface GenerationParams {
   generationSize?: number;
 
   numBestPerformersToKeep?: number;
   numBreeders?: number;
   numRandom?: number;
-};
-type SimulatorControls = {
-  generationSize?: number;
-
-  numBestPerformersToKeep?: number;
-  numBreeders?: number;
-  numRandom?: number;
-
+}
+interface SimulatorControls extends GenerationParams {
   numHiddenNodes?: number;
 
   numSensors?: number;
   sensorLength?: number;
   sensorAngle?: number;
-};
+}
 
 const DEFAULT_CONTROLS: SimulatorControls = {
   generationSize: 20,

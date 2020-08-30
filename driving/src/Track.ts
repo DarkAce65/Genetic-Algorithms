@@ -18,7 +18,10 @@ export interface Checkpoint extends Body {
   lastCheckpoint: boolean;
 }
 
-type TrackPoint = { position: Vector2; width?: number };
+interface TrackPoint {
+  position: Vector2;
+  width?: number;
+}
 type TrackDefinition = TrackPoint[];
 
 const constructWall = (point0: Vector2, point1: Vector2): Body => {

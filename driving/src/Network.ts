@@ -1,18 +1,23 @@
 import chroma from 'chroma-js';
 
 import { CanvasParams } from './constants';
-import { clamp, squaredSum } from './utils';
+import { clamp } from './utils';
 
-type NetworkStructure = { numInputs: number; numHiddenNodes: number; numOutputs: number };
-type NetworkValues = { inputLayerWeights: number[]; hiddenLayerWeights: number[] };
+interface NetworkStructure {
+  numInputs: number;
+  numHiddenNodes: number;
+  numOutputs: number;
+}
+interface NetworkValues {
+  inputLayerWeights: number[];
+  hiddenLayerWeights: number[];
+}
 
 const networkColorScale = chroma.scale(['aquamarine', '#222222', 'white']).domain([-1, 1]);
 
 class Network {
   private inputLayerWeights: number[] = [];
   private hiddenLayerWeights: number[] = [];
-
-  private readonly weightsSquared: number;
 
   constructor(readonly structure: NetworkStructure, values?: NetworkValues) {
     const { numInputs, numHiddenNodes, numOutputs } = structure;
@@ -37,8 +42,6 @@ class Network {
         this.hiddenLayerWeights.push(Math.random() * 2 - 1);
       }
     }
-
-    this.weightsSquared = squaredSum(this.inputLayerWeights) + squaredSum(this.hiddenLayerWeights);
   }
 
   static transformIfNecessary(structure: NetworkStructure, network: Network): Network {

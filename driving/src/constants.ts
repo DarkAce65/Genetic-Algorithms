@@ -1,5 +1,9 @@
 export type Vector2 = [number, number];
-export type CanvasParams = { ctx: CanvasRenderingContext2D; width: number; height: number };
+export interface CanvasParams {
+  ctx: CanvasRenderingContext2D;
+  width: number;
+  height: number;
+}
 
 export const MOVING_AVERAGE_ALPHA = 0.1;
 export const MINIMUM_AVERAGE_SPEED = 1;

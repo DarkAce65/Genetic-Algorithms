@@ -12,14 +12,21 @@ import {
 } from './constants';
 import { wrappedModulo } from './utils';
 
-type SimulationDataPoint = { position: Vector2; speed: number; fitness: number };
-type SimulationData = {
+interface SimulationDataPoint {
+  position: Vector2;
+  speed: number;
+  fitness: number;
+}
+interface SimulationData {
   datapoints: SimulationDataPoint[];
   minSpeed: number;
   maxSpeed: number;
   bestFitness: number;
-};
-type SimulationResult = { fitness: number; avgSpeed: number };
+}
+interface SimulationResult {
+  fitness: number;
+  avgSpeed: number;
+}
 
 class Simulation {
   private world: World;
