@@ -47,6 +47,9 @@ module.exports = {
         'prettier/@typescript-eslint',
       ],
       parserOptions: { ecmaVersion: 6, sourceType: 'module' },
+      rules: {
+        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      },
     },
   ],
 };
