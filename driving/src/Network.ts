@@ -76,6 +76,50 @@ class Network {
     this.structure = { numInputs, numHiddenNodes, numOutputs };
   }
 
+  static drawStructure({ ctx, width, height }: CanvasParams, structure: NetworkStructure): void {
+    ctx.clearRect(0, 0, width, height);
+
+    const { numInputs, numHiddenNodes, numOutputs } = structure;
+
+    ctx.strokeStyle = 'white';
+    ctx.fillStyle = 'white';
+
+    for (let i = 0; i < numInputs; i++) {
+      const p = (i + 0.5) / numInputs;
+      for (let j = 0; j < numHiddenNodes; j++) {
+        const pn = (j + 0.5) / numHiddenNodes;
+        ctx.beginPath();
+        ctx.moveTo(30, p * height);
+        ctx.lineTo(width / 2, pn * height);
+        ctx.stroke();
+      }
+    }
+
+    for (let i = 0; i < numHiddenNodes; i++) {
+      const p = (i + 0.5) / numHiddenNodes;
+      for (let j = 0; j < numOutputs; j++) {
+        const pn = (j + 0.5) / numOutputs;
+        ctx.beginPath();
+        ctx.moveTo(width / 2, p * height);
+        ctx.lineTo(width - 30, pn * height);
+        ctx.stroke();
+      }
+    }
+
+    const drawNodes = (x, numNodes) => {
+      for (let i = 0; i < numNodes; i++) {
+        const p = (i + 0.5) / numNodes;
+        ctx.beginPath();
+        ctx.arc(x, p * height, 5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    };
+
+    drawNodes(30, numInputs);
+    drawNodes(width / 2, numHiddenNodes);
+    drawNodes(width - 30, numOutputs);
+  }
+
   loadWeights(input: number[], hidden: number[]): void {
     this.inputLayerWeights = input;
     this.hiddenLayerWeights = hidden;
@@ -149,32 +193,20 @@ class Network {
     hidden: number[],
     output: number[]
   ): void {
-    for (let i = 0; i < input.length; i++) {
-      const p = (i + 0.5) / input.length;
-      const w = input[i];
-      ctx.fillStyle = networkColorScale(w);
-      ctx.beginPath();
-      ctx.arc(30, p * height, 5, 0, 2 * Math.PI);
-      ctx.fill();
-    }
+    const drawNodes = (x, nodes) => {
+      for (let i = 0; i < nodes.length; i++) {
+        const p = (i + 0.5) / nodes.length;
+        const w = nodes[i];
+        ctx.fillStyle = networkColorScale(w);
+        ctx.beginPath();
+        ctx.arc(x, p * height, 5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    };
 
-    for (let i = 0; i < hidden.length; i++) {
-      const p = (i + 0.5) / hidden.length;
-      const w = hidden[i];
-      ctx.fillStyle = networkColorScale(w);
-      ctx.beginPath();
-      ctx.arc(width / 2, p * height, 5, 0, 2 * Math.PI);
-      ctx.fill();
-    }
-
-    for (let i = 0; i < output.length; i++) {
-      const p = (i + 0.5) / output.length;
-      const w = output[i];
-      ctx.fillStyle = networkColorScale(w);
-      ctx.beginPath();
-      ctx.arc(width - 30, p * height, 5, 0, 2 * Math.PI);
-      ctx.fill();
-    }
+    drawNodes(30, input);
+    drawNodes(width / 2, hidden);
+    drawNodes(width - 30, output);
   }
 }
 

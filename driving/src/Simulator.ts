@@ -27,7 +27,7 @@ class Simulator {
   private genome = 0;
   private bestFitness = 0;
 
-  private trails: Vector2[][] = [];
+  private generationTrails: Vector2[][] = [];
 
   private activeSimulation: Simulation = null;
 
@@ -54,12 +54,23 @@ class Simulator {
     this.genome = 0;
     this.bestFitness = 0;
 
-    this.trails = [];
+    this.generationTrails = [];
     this.activeSimulation = this.createNewSimulation();
 
     const { ctx, width, height } = this.simCanvasParams;
     ctx.clearRect(0, 0, width, height);
     this.track.draw(this.simCanvasParams.ctx);
+
+    const { numHiddenNodes, numSensors } = this.simulatorControls;
+    const networkStructure = { numInputs: numSensors, numHiddenNodes, numOutputs: 3 };
+    Network.drawStructure(this.netCanvasParams, networkStructure);
+
+    const {
+      ctx: carStatusCtx,
+      width: carStatusWidth,
+      height: carStatusHeight,
+    } = this.carStatusCanvasParams;
+    carStatusCtx.clearRect(0, 0, carStatusWidth, carStatusHeight);
   }
 
   start(): void {
@@ -94,9 +105,14 @@ class Simulator {
   }
 
   private handleSimulationComplete(): void {
+    this.generationTrails.push(this.activeSimulation.getCarTrail());
     this.trails.push(this.activeSimulation.getCarTrail());
 
     this.genome++;
+    if (this.genome >= this.simulatorControls.generationSize) {
+      this.generation++;
+      this.genome = 0;
+    }
 
     document.querySelector('#genetic').innerHTML = `Generation: ${this.generation}, Genome: ${
       this.genome
@@ -120,7 +136,7 @@ class Simulator {
       this.simCanvasParams,
       this.netCanvasParams,
       this.carStatusCanvasParams,
-      this.trails
+      this.generationTrails
     );
 
     if (fitness > this.bestFitness) {
