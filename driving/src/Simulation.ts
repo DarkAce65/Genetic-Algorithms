@@ -31,7 +31,7 @@ class Simulation {
   private stoppedTicks = TICKS_TO_WAIT_FOR_STOP;
 
   constructor(
-    private readonly network: Network,
+    readonly network: Network,
     private readonly car: Car,
     private readonly track: Track,
     private readonly finishCallback: (fitness: number) => void
