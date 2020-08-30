@@ -167,7 +167,7 @@ class Simulation {
     const inputs = this.car.getNormalizedSensorValues();
     const [throttle, brake, steer] = this.network.evaluateAndDraw(inputs, netCanvasParams);
 
-    this.car.update(this.world, throttle, brake, steer);
+    this.car.update(throttle, brake, steer);
     this.car.draw(ctx, steer);
 
     const avgSpeed = this.car.avgSpeed;

@@ -125,24 +125,7 @@ class Car {
     this.tdv.addToWorld(world);
   }
 
-  update(world: World, throttle: number, brake: number, steer: number): void {
-    const steerValue = 0.63 * -(steer * 2 - 1);
-    const engineForce = 150 * throttle;
-    const brakeForce = 150 * brake;
-
-    this.wheels[0].steerValue = steerValue;
-    this.wheels[1].steerValue = steerValue;
-
-    this.wheels[2].engineForce = engineForce;
-    this.wheels[3].engineForce = engineForce;
-
-    this.wheels[2].setBrakeForce(brakeForce);
-    this.wheels[3].setBrakeForce(brakeForce);
-
-    this.avgSpeed += MOVING_AVERAGE_ALPHA * (this.getSpeed() - this.avgSpeed);
-  }
-
-  computeSensorIntersections(world: World) {
+  computeSensorIntersections(world: World): void {
     const result = new RaycastResult();
     for (const sensor of this.sensors) {
       const localFrom = p2.vec2.clone(sensor.localFrom);
@@ -174,6 +157,23 @@ class Car {
         sensor.hitNormal = null;
       }
     }
+  }
+
+  update(throttle: number, brake: number, steer: number): void {
+    const steerValue = 0.63 * -(steer * 2 - 1);
+    const engineForce = 150 * throttle;
+    const brakeForce = 150 * brake;
+
+    this.wheels[0].steerValue = steerValue;
+    this.wheels[1].steerValue = steerValue;
+
+    this.wheels[2].engineForce = engineForce;
+    this.wheels[3].engineForce = engineForce;
+
+    this.wheels[2].setBrakeForce(brakeForce);
+    this.wheels[3].setBrakeForce(brakeForce);
+
+    this.avgSpeed += MOVING_AVERAGE_ALPHA * (this.getSpeed() - this.avgSpeed);
   }
 
   draw(ctx: CanvasRenderingContext2D, steer: number): void {
