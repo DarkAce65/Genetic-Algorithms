@@ -6,7 +6,7 @@ import { Vector2 } from './constants';
 
 const width = 800;
 const height = 600;
-document.getElementById('stats').style.width = `${width}px`;
+document.getElementById('statsContainer').style.maxWidth = `${width}px`;
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 canvas.width = width;
 canvas.height = height;

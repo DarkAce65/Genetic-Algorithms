@@ -8,12 +8,18 @@
   </head>
   <body>
     <div class="container">
-      <div id="stats">
+      <div id="statsContainer">
         <canvas id="net"></canvas>
-        <div style="display: inline-block;">
-          <div id="genetic">Generation: 0, Genome: 0<br />Best Fitness: 0.00</div>
-          <div id="individual">Fitness: 0.00, Avg. Speed: 0.00</div>
-          <br />
+        <div style="flex-grow: 1;">
+          <div id="stats">
+            <div>
+              Generation: <span id="generation">0</span>, Genome: <span id="genome">0</span>
+            </div>
+            <div>Best Fitness: <span id="bestFitness">0.00</span></div>
+            <div>
+              Fitness: <span id="fitness">0.00</span>, Avg. Speed: <span id="avgSpeed">0.00</span>
+            </div>
+          </div>
           <div>
             <button id="start">Start</button>
             <button id="kill">Kill Current Simulation</button>

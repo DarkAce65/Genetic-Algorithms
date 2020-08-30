@@ -78,6 +78,12 @@ class Simulator {
     this.scoresAndNetwork = [];
     this.generationTrails = [];
 
+    document.querySelector('#generation').innerHTML = `${this.generation}`;
+    document.querySelector('#genome').innerHTML = `${this.genome}`;
+    document.querySelector('#bestFitness').innerHTML = (0).toFixed(2);
+    document.querySelector('#fitness').innerHTML = (0).toFixed(2);
+    document.querySelector('#avgSpeed').innerHTML = (0).toFixed(2);
+
     const { ctx, width, height } = this.simCanvasParams;
     ctx.clearRect(0, 0, width, height);
     this.track.draw(this.simCanvasParams.ctx);
@@ -102,13 +108,6 @@ class Simulator {
     this.running = true;
     this.activeSimulation = this.createNewSimulation();
     this.activeSimulation.initialize();
-
-    document.querySelector('#genetic').innerHTML = `Generation: ${this.generation}, Genome: ${
-      this.genome
-    }<br>Best Fitness: ${(0).toFixed(2)}`;
-    document.querySelector('#individual').innerHTML = `Fitness: ${(0).toFixed(
-      2
-    )}, Avg. Speed: ${(0).toFixed(2)}`;
 
     this.run();
   }
@@ -174,9 +173,9 @@ class Simulator {
       this.generationTrails = [];
     }
 
-    document.querySelector('#genetic').innerHTML = `Generation: ${this.generation}, Genome: ${
-      this.genome
-    }<br>Best Fitness: ${this.bestFitness.toFixed(2)}`;
+    document.querySelector('#generation').innerHTML = `${this.generation}`;
+    document.querySelector('#genome').innerHTML = `${this.genome}`;
+    document.querySelector('#bestFitness').innerHTML = this.bestFitness.toFixed(2);
 
     this.activeSimulation = this.createNewSimulation();
     this.activeSimulation.initialize();
@@ -197,14 +196,11 @@ class Simulator {
     if (fitness > this.bestFitness) {
       this.bestFitness = fitness;
 
-      document.querySelector('#genetic').innerHTML = `Generation: ${this.generation}, Genome: ${
-        this.genome
-      }<br>Best Fitness: ${this.bestFitness.toFixed(2)}`;
+      document.querySelector('#bestFitness').innerHTML = this.bestFitness.toFixed(2);
     }
 
-    document.querySelector('#individual').innerHTML = `Fitness: ${fitness.toFixed(
-      2
-    )}, Avg. Speed: ${avgSpeed.toFixed(2)}`;
+    document.querySelector('#fitness').innerHTML = fitness.toFixed(2);
+    document.querySelector('#avgSpeed').innerHTML = avgSpeed.toFixed(2);
 
     requestAnimationFrame(this.run);
   }

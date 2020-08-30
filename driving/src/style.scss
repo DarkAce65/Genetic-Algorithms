@@ -49,27 +49,23 @@ canvas {
 
 #canvas {
   border-color: white;
+  max-width: 100%;
 }
 
-#stats {
+#statsContainer {
+  display: flex;
   margin: 10px auto;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
 
-  &::after {
-    content: '';
-    display: block;
-    clear: both;
+  #net,
+  #carStatus {
+    flex: 0 0 auto;
   }
-}
 
-#net {
-  float: left;
-}
-
-#genetic,
-#individual {
-  font-family: monospace;
-}
-
-#carStatus {
-  float: right;
+  #stats {
+    font-family: monospace;
+    margin-bottom: 10px;
+  }
 }
