@@ -4,6 +4,13 @@ import Simulation from './Simulation';
 import Track from './Track';
 import { CanvasParams, Vector2 } from './constants';
 
+type GenerationParams = {
+  generationSize?: number;
+
+  numBestPerformersToKeep?: number;
+  numBreeders?: number;
+  numRandom?: number;
+};
 type SimulatorControls = {
   generationSize?: number;
 
@@ -31,6 +38,7 @@ class Simulator {
   private running = false;
 
   private simulatorControls: SimulatorControls;
+  private generationParams: GenerationParams;
 
   private generation = 0;
   private genome = 0;
@@ -58,11 +66,15 @@ class Simulator {
       ...DEFAULT_CONTROLS,
       ...simulatorControls,
     };
+    this.generationParams = { ...this.simulatorControls };
+
     this.reset();
   }
 
   reset(): void {
     this.running = false;
+    this.generationParams = { ...this.simulatorControls };
+
     this.generation = 0;
     this.genome = 0;
     this.bestFitness = 0;
@@ -124,14 +136,8 @@ class Simulator {
   }
 
   private createNewSimulation(): Simulation {
-    const {
-      generationSize,
-      numRandom,
-      numHiddenNodes,
-      numSensors,
-      sensorLength,
-      sensorAngle,
-    } = this.simulatorControls;
+    const { generationSize, numRandom } = this.generationParams;
+    const { numHiddenNodes, numSensors, sensorLength, sensorAngle } = this.simulatorControls;
     const networkStructure = { numInputs: numSensors, numHiddenNodes, numOutputs: 3 };
 
     let network;
@@ -155,18 +161,20 @@ class Simulator {
     this.generationTrails.push(this.activeSimulation.getCarTrail());
 
     this.genome++;
-    if (this.genome >= this.simulatorControls.generationSize) {
+    if (this.genome >= this.generationParams.generationSize) {
+      this.generationParams = { ...this.simulatorControls };
+
       this.generation++;
       this.genome = 0;
 
       this.scoresAndNetwork.sort((a, b) => b[0] - a[0]);
 
       this.bestPerformers = this.scoresAndNetwork
-        .slice(0, this.simulatorControls.numBestPerformersToKeep)
+        .slice(0, this.generationParams.numBestPerformersToKeep)
         .map(([_, network]) => network)
         .reverse();
       this.breeders = this.scoresAndNetwork
-        .slice(0, this.simulatorControls.numBreeders)
+        .slice(0, this.generationParams.numBreeders)
         .map(([_, network]) => network);
 
       this.scoresAndNetwork = [];
