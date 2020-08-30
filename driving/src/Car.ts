@@ -139,12 +139,10 @@ class Car {
     this.wheels[2].setBrakeForce(brakeForce);
     this.wheels[3].setBrakeForce(brakeForce);
 
-    this.computeSensorIntersections(world);
-
     this.avgSpeed += MOVING_AVERAGE_ALPHA * (this.getSpeed() - this.avgSpeed);
   }
 
-  private computeSensorIntersections(world: World) {
+  computeSensorIntersections(world: World) {
     const result = new RaycastResult();
     for (const sensor of this.sensors) {
       const localFrom = p2.vec2.clone(sensor.localFrom);

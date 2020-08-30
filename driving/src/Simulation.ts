@@ -163,6 +163,7 @@ class Simulation {
 
     this.drawTrails(ctx, trails);
 
+    this.car.computeSensorIntersections(this.world);
     const inputs = this.car.getNormalizedSensorValues();
     const [throttle, brake, steer] = this.network.evaluateAndDraw(inputs, netCanvasParams);
 
