@@ -116,7 +116,7 @@ class Car {
 
   getNormalizedSensorValues(): number[] {
     return this.sensors.map((sensor) =>
-      sensor.hasHit ? sensor.hitDistance / sensor.ray.length : 1
+      sensor.hasHit ? sensor.hitDistance! / sensor.ray.length : 1
     );
   }
 
@@ -152,9 +152,9 @@ class Car {
         sensor.hitPoint = hitPoint;
         sensor.hitNormal = result.normal;
       } else {
-        sensor.hitDistance = null;
-        sensor.hitPoint = null;
-        sensor.hitNormal = null;
+        sensor.hitDistance = undefined;
+        sensor.hitPoint = undefined;
+        sensor.hitNormal = undefined;
       }
     }
   }
@@ -239,9 +239,10 @@ class Car {
       ctx.lineTo(sensor.ray.to[0], sensor.ray.to[1]);
       ctx.stroke();
 
-      const { hitPoint, hitNormal } = sensor;
-
       if (sensor.hasHit) {
+        const hitPoint = sensor.hitPoint!;
+        const hitNormal = sensor.hitNormal!;
+
         ctx.beginPath();
         ctx.arc(hitPoint[0], hitPoint[1], hitPointRadius, 0, 2 * Math.PI);
         ctx.stroke();

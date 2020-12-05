@@ -30,8 +30,8 @@ interface SimulationResult {
 
 class Simulation {
   private world: World;
-  private checkpoint: number;
-  private laps: number;
+  private checkpoint = 0;
+  private laps = 0;
 
   readonly simulationData: SimulationData;
   private completed = false;
@@ -149,7 +149,7 @@ class Simulation {
     trails: Vector2[][]
   ): SimulationResult {
     if (this.completed) {
-      return;
+      return { fitness: this.fitness(), avgSpeed: this.car.avgSpeed };
     }
 
     this.world.step(1 / 60);

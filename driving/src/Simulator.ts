@@ -5,25 +5,38 @@ import Track from './Track';
 import { CanvasParams, Vector2 } from './constants';
 
 interface GenerationParams {
+  generationSize: number;
+
+  numBestPerformersToKeep: number;
+  numBreeders: number;
+  numRandom: number;
+}
+interface SimulatorParams {
+  numHiddenNodes: number;
+
+  numSensors: number;
+  sensorLength?: number;
+  sensorAngle?: number;
+}
+
+interface SimulatorOptions {
   generationSize?: number;
 
   numBestPerformersToKeep?: number;
   numBreeders?: number;
   numRandom?: number;
-}
-interface SimulatorControls extends GenerationParams {
+
   numHiddenNodes?: number;
-
   numSensors?: number;
-  sensorLength?: number;
-  sensorAngle?: number;
 }
 
-const DEFAULT_CONTROLS: SimulatorControls = {
+const DEFAULT_CONTROLS = {
   generationSize: 20,
+
   numBestPerformersToKeep: 1,
   numBreeders: 2,
   numRandom: 1,
+
   numHiddenNodes: 5,
   numSensors: 3,
 };
@@ -31,7 +44,7 @@ const DEFAULT_CONTROLS: SimulatorControls = {
 class Simulator {
   private running = false;
 
-  private simulatorControls: SimulatorControls;
+  private simulatorControls: SimulatorParams;
   private generationParams: GenerationParams;
 
   private generation = 0;
@@ -44,30 +57,46 @@ class Simulator {
   private scoresAndNetwork: [number, Network][] = [];
   private generationTrails: Vector2[][] = [];
 
-  private activeSimulation: Simulation = null;
+  private activeSimulation: Simulation | null = null;
 
   constructor(
     private readonly track: Track,
     private readonly simCanvasParams: CanvasParams,
     private readonly netCanvasParams: CanvasParams,
     private readonly carStatusCanvasParams: CanvasParams,
-    simulatorControls: SimulatorControls = {}
+    private readonly simulatorOptions: SimulatorOptions = {}
   ) {
     this.handleSimulationComplete = this.handleSimulationComplete.bind(this);
     this.run = this.run.bind(this);
 
     this.simulatorControls = {
-      ...DEFAULT_CONTROLS,
-      ...simulatorControls,
+      numHiddenNodes: this.simulatorOptions.numHiddenNodes ?? DEFAULT_CONTROLS.numHiddenNodes,
+      numSensors: this.simulatorOptions.numSensors ?? DEFAULT_CONTROLS.numSensors,
     };
-    this.generationParams = { ...this.simulatorControls };
+    this.generationParams = {
+      generationSize: this.simulatorOptions.generationSize ?? DEFAULT_CONTROLS.generationSize,
+      numBestPerformersToKeep:
+        this.simulatorOptions.numBestPerformersToKeep ?? DEFAULT_CONTROLS.numBestPerformersToKeep,
+      numBreeders: this.simulatorOptions.numBreeders ?? DEFAULT_CONTROLS.numBreeders,
+      numRandom: this.simulatorOptions.numRandom ?? DEFAULT_CONTROLS.numRandom,
+    };
 
     this.reset();
   }
 
+  private resetGenerationParams(): void {
+    this.generationParams = {
+      generationSize: this.simulatorOptions.generationSize ?? DEFAULT_CONTROLS.generationSize,
+      numBestPerformersToKeep:
+        this.simulatorOptions.numBestPerformersToKeep ?? DEFAULT_CONTROLS.numBestPerformersToKeep,
+      numBreeders: this.simulatorOptions.numBreeders ?? DEFAULT_CONTROLS.numBreeders,
+      numRandom: this.simulatorOptions.numRandom ?? DEFAULT_CONTROLS.numRandom,
+    };
+  }
+
   reset(): void {
     this.running = false;
-    this.generationParams = { ...this.simulatorControls };
+    this.resetGenerationParams();
 
     this.generation = 0;
     this.genome = 0;
@@ -78,11 +107,11 @@ class Simulator {
     this.scoresAndNetwork = [];
     this.generationTrails = [];
 
-    document.querySelector('#generation').innerHTML = `${this.generation}`;
-    document.querySelector('#genome').innerHTML = `${this.genome}`;
-    document.querySelector('#bestFitness').innerHTML = (0).toFixed(2);
-    document.querySelector('#fitness').innerHTML = (0).toFixed(2);
-    document.querySelector('#avgSpeed').innerHTML = (0).toFixed(2);
+    document.querySelector('#generation')!.innerHTML = `${this.generation}`;
+    document.querySelector('#genome')!.innerHTML = `${this.genome}`;
+    document.querySelector('#bestFitness')!.innerHTML = (0).toFixed(2);
+    document.querySelector('#fitness')!.innerHTML = (0).toFixed(2);
+    document.querySelector('#avgSpeed')!.innerHTML = (0).toFixed(2);
 
     const { ctx, width, height } = this.simCanvasParams;
     ctx.clearRect(0, 0, width, height);
@@ -134,7 +163,7 @@ class Simulator {
 
     let network;
     if (this.bestPerformers.length > 0) {
-      network = Network.transformIfNecessary(networkStructure, this.bestPerformers.pop());
+      network = Network.transformIfNecessary(networkStructure, this.bestPerformers.pop()!);
     } else if (generationSize - this.genome > numRandom && this.breeders.length >= 2) {
       network = Network.fromParents(networkStructure, this.getRandomBreeders());
     } else {
@@ -146,6 +175,10 @@ class Simulator {
   }
 
   private handleSimulationComplete(): void {
+    if (this.activeSimulation === null) {
+      return;
+    }
+
     this.scoresAndNetwork.push([
       this.activeSimulation.simulationData.bestFitness,
       this.activeSimulation.network,
@@ -154,7 +187,7 @@ class Simulator {
 
     this.genome++;
     if (this.genome >= this.generationParams.generationSize) {
-      this.generationParams = { ...this.simulatorControls };
+      this.resetGenerationParams();
 
       this.generation++;
       this.genome = 0;
@@ -173,16 +206,16 @@ class Simulator {
       this.generationTrails = [];
     }
 
-    document.querySelector('#generation').innerHTML = `${this.generation}`;
-    document.querySelector('#genome').innerHTML = `${this.genome}`;
-    document.querySelector('#bestFitness').innerHTML = this.bestFitness.toFixed(2);
+    document.querySelector('#generation')!.innerHTML = `${this.generation}`;
+    document.querySelector('#genome')!.innerHTML = `${this.genome}`;
+    document.querySelector('#bestFitness')!.innerHTML = this.bestFitness.toFixed(2);
 
     this.activeSimulation = this.createNewSimulation();
     this.activeSimulation.initialize();
   }
 
   private run(): void {
-    if (!this.running) {
+    if (!this.running || this.activeSimulation === null) {
       return;
     }
 
@@ -196,11 +229,11 @@ class Simulator {
     if (fitness > this.bestFitness) {
       this.bestFitness = fitness;
 
-      document.querySelector('#bestFitness').innerHTML = this.bestFitness.toFixed(2);
+      document.querySelector('#bestFitness')!.innerHTML = this.bestFitness.toFixed(2);
     }
 
-    document.querySelector('#fitness').innerHTML = fitness.toFixed(2);
-    document.querySelector('#avgSpeed').innerHTML = avgSpeed.toFixed(2);
+    document.querySelector('#fitness')!.innerHTML = fitness.toFixed(2);
+    document.querySelector('#avgSpeed')!.innerHTML = avgSpeed.toFixed(2);
 
     requestAnimationFrame(this.run);
   }

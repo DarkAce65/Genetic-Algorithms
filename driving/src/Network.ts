@@ -76,8 +76,8 @@ class Network {
     const { numInputs, numHiddenNodes, numOutputs } = structure;
     const [p0, p1] = parents;
 
-    const inputLayerWeights = [];
-    const hiddenLayerWeights = [];
+    const inputLayerWeights: number[] = [];
+    const hiddenLayerWeights: number[] = [];
 
     for (let i = 0; i < numInputs * numHiddenNodes; i++) {
       const r = Math.random();

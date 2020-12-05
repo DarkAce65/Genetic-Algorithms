@@ -6,11 +6,11 @@ import { Vector2 } from './constants';
 
 const width = 800;
 const height = 600;
-document.getElementById('statsContainer').style.maxWidth = `${width}px`;
+document.getElementById('statsContainer')!.style.maxWidth = `${width}px`;
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 canvas.width = width;
 canvas.height = height;
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 ctx.scale(1, -1);
 ctx.translate(0, -height);
 
@@ -19,12 +19,12 @@ const statHeight = 125;
 const netCanvas = document.getElementById('net') as HTMLCanvasElement;
 netCanvas.width = statWidth;
 netCanvas.height = statHeight;
-const netCtx = netCanvas.getContext('2d');
+const netCtx = netCanvas.getContext('2d') as CanvasRenderingContext2D;
 
 const carStatusCanvas = document.getElementById('carStatus') as HTMLCanvasElement;
 carStatusCanvas.width = statWidth;
 carStatusCanvas.height = statHeight;
-const carStatusCtx = carStatusCanvas.getContext('2d');
+const carStatusCtx = carStatusCanvas.getContext('2d') as CanvasRenderingContext2D;
 carStatusCtx.scale(1, -1);
 carStatusCtx.translate(0, -statHeight);
 
@@ -56,6 +56,6 @@ const track = new Track(trackPoints.map((position) => ({ position })));
 
 const simulator = new Simulator(track, simCanvasParams, netCanvasParams, carStatusCanvasParams);
 
-document.querySelector('#start').addEventListener('click', () => simulator.start());
-document.querySelector('#kill').addEventListener('click', () => simulator.killCurrentSimulation());
-document.querySelector('#reset').addEventListener('click', () => simulator.reset());
+document.querySelector('#start')!.addEventListener('click', () => simulator.start());
+document.querySelector('#kill')!.addEventListener('click', () => simulator.killCurrentSimulation());
+document.querySelector('#reset')!.addEventListener('click', () => simulator.reset());
