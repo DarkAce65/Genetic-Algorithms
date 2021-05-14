@@ -116,14 +116,10 @@ class Simulation {
   }
 
   private fitness(): number {
-    const {
-      position: prevCheckpointPosition,
-      cumulativeDistance: prevCheckpointDistance,
-    } = this.track.checkpoints[wrappedModulo(this.checkpoint - 1, this.track.checkpoints.length)];
-    const {
-      position: nextCheckpointPosition,
-      trackSegmentLength: nextCheckpointSegmentLength,
-    } = this.track.checkpoints[this.checkpoint];
+    const { position: prevCheckpointPosition, cumulativeDistance: prevCheckpointDistance } =
+      this.track.checkpoints[wrappedModulo(this.checkpoint - 1, this.track.checkpoints.length)];
+    const { position: nextCheckpointPosition, trackSegmentLength: nextCheckpointSegmentLength } =
+      this.track.checkpoints[this.checkpoint];
 
     const [pt0x, pt0y] = prevCheckpointPosition;
     const [pt1x, pt1y] = this.car.position;

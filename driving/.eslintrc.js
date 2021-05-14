@@ -1,9 +1,9 @@
 const prettierConfig = require('./prettier.config');
 
 module.exports = {
-  parser: 'babel-eslint',
+  parser: '@babel/eslint-parser',
   plugins: ['prettier', 'import'],
-  extends: ['eslint:recommended', 'prettier'],
+  extends: ['eslint:recommended', 'prettier', 'plugin:prettier/recommended'],
   env: { browser: true, node: true, es6: true },
   parserOptions: { ecmaVersion: 6 },
   rules: {
@@ -29,9 +29,7 @@ module.exports = {
       'warn',
       {
         'newlines-between': 'always',
-        groups: ['builtin', ['external', 'internal'], 'parent', 'sibling', 'index'],
-        pathGroups: [{ pattern: '{uikit,uikit/**}', group: 'external', position: 'before' }],
-        pathGroupsExcludedImportTypes: ['uikit'],
+        groups: ['builtin', 'external', ['internal', 'parent'], 'sibling', 'index'],
         alphabetize: { order: 'asc', caseInsensitive: false },
       },
     ],
@@ -44,10 +42,12 @@ module.exports = {
       extends: [
         'eslint:recommended',
         'plugin:@typescript-eslint/recommended',
-        'prettier/@typescript-eslint',
+        'prettier',
+        'plugin:prettier/recommended',
       ],
       parserOptions: { ecmaVersion: 6, sourceType: 'module' },
       rules: {
+        'prettier/prettier': ['warn', prettierConfig],
         '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
         '@typescript-eslint/no-non-null-assertion': 'off',
       },
